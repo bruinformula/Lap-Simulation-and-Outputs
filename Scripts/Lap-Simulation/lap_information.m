@@ -1,5 +1,5 @@
 % function [lap_time time_elapsed velocity acceleration lateral_accel gear_counter path_length weights distance] = lap_information(path_positions)
-function [acceleration lateral_accel] = lap_information(path_positions)
+function [acceleration lateral_accel] = lap_information(path_positions, lap_coords)
 
 global path_boundaries r_min r_max cornering accel grip deccel lateral...
     shift_points top_speed shift_time
@@ -329,7 +329,7 @@ weights = [t_t/summ t_b/summ t_c/summ];
 %% Plot Results
 
 % Load the data from the Scaled sheet of the Excel file
-filename = 'Endurance_Coordinates_1.xlsx';
+filename = lap_coords;
 outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
 inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
 

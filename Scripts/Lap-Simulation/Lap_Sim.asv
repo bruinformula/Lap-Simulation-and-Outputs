@@ -1,7 +1,7 @@
-function [acceleration, lateral_accel] = Lap_Sim(lap_coords)
+function [acceleration, lateral_acceleration] = Lap_Sim(endurance_coordinates)
 
 addpath("../../Data Files")
-%endurance_coordinates = append("../", endurance_coordinates); 
+addpath("")
 
 % Jonathan Vogel
 % Clemson Formula SAE
@@ -19,7 +19,7 @@ clc
 % them global so that all the other functions can access them
 global r_max accel grip deccel lateral cornering gear shift_points...
     top_speed r_min path_boundaries tire_radius shift_time...
-    powertrainpackage
+    powertrainpackage track_width path_boundaries_ax
 %% Section 1: Input Tire Model
 % this section is required, everything should be pre-loaded so no need to
 % touch any of this, unless you want to change the tire being evaluated.
@@ -31,8 +31,8 @@ disp('Loading Tire Model')
 % First we load in the lateral tire force model, which is a Pacejka model
 % created by derek:
 
-% global FZ0 LFZO LCX LMUX LEX LKX  LHX LVX LCY LMUY LEY LKY LHY LVY ...
-%        LGAY Ltr LRES LGAZ LXAL LYKA LVYKA LS LSGKP  LSGAL LGYR KY
+global FZ0 LFZO LCX LMUX LEX LKX  LHX LVX LCY LMUY LEY LKY LHY LVY ...
+       LGAY Ltr LRES LGAZ LXAL LYKA LVYKA LS LSGKP  LSGAL LGYR KY
 load('A1654run21_MF52_Fy_GV12.mat')
 % then load in coefficients for Magic Formula 5.2 Tire Model:
 load('A1654run21_MF52_Fy_12.mat')
@@ -1283,7 +1283,7 @@ radii = velocity_y.^2./lateralg/32.2;
 cornering = csaps(radii,velocity_y);
 %% Section 7: Load Endurance Track Coordinates
 disp('Loading Endurance Track Coordinates')
-[data text] = xlsread(lap_coords,'Scaled');
+[data text] = xlsread(endurance_coordinates,'Scaled');
 
 % the coordinates are now contained within 'data'. This is a 5 column
 % matrix that contains a set of defined 'gates' that the car must mavigate
@@ -1373,11 +1373,11 @@ vehicle_path_EN = vehicle_path;
 Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
-[acceleration lateral_accel] = lap_information(xx, lap_coords);
+[acceleration lateral_accel] = lap_information(xx);
 
 %% Section 12: Plotting
 % Load the data from the Scaled sheet of the Excel file
-filename = lap_coords;
+filename = 'Endurance_Coordinates_1.xlsx';
 outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
 inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
 

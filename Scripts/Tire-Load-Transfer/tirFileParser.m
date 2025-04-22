@@ -3,7 +3,9 @@ clear
 close all
 
 % Load .tir file in MATLAB
-tireFilePath = 'C:\Users\Rohan Shinde\Box\BFR\MK10\Mk. 10 Vehicle Dynamics\Tires and Sim\Tires\Tire Fitting Tools\.tir Files\magicformula_R20.tir';
+% tireFilePath = 'C:\Users\Rohan Shinde\Box\BFR\MK10\Mk. 10 Vehicle Dynamics\Tires and Sim\Tires\Tire Fitting Tools\.tir Files\magicformula_R20.tir';
+tireFilePath = '../../magicformula_R20.tir';
+
 
 tireData = simscape.multibody.tirread(tireFilePath);
 
