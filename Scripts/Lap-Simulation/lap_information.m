@@ -1,5 +1,5 @@
 % function [lap_time time_elapsed velocity acceleration lateral_accel gear_counter path_length weights distance] = lap_information(path_positions)
-function [acceleration lateral_accel] = lap_information(path_positions, lap_coords)
+function [acceleration, lateral_accel] = lap_information(path_positions, lap_coords)
 
 global path_boundaries r_min r_max cornering accel grip deccel lateral...
     shift_points top_speed shift_time
@@ -46,9 +46,11 @@ RT = RT(~isnan(RT));
 % travelled
 for i = 1:length(RT)
     segment(i) = i;
-    r = max(r_min,RT(i));
-    r = min(r,r_max);
-    RT(i) = r;
+    % r = max(r_min,RT(i));
+    r = RT(i);
+    % r = min(r,r_max);
+    % 
+    % RT(i) = r;
     Vmax(i) = min(VMAX,fnval(cornering,r));
     x1(i) = track_points(1,i+1);
     x2(i) = track_points(1,i+2);
@@ -328,34 +330,34 @@ weights = [t_t/summ t_b/summ t_c/summ];
 
 %% Plot Results
 
-% Load the data from the Scaled sheet of the Excel file
-filename = lap_coords;
-outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
-inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
-
-% Remove NaN values (if present)
-outside_track = outside_track(~any(isnan(outside_track), 2), :);
-inside_track = inside_track(~any(isnan(inside_track), 2), :);
-
-figure
-hold on;
-axis equal;
-
-% Plot points for both tracks
-plot(outside_track(:,1), outside_track(:,2), 'k.', 'MarkerSize', 10);
-plot(inside_track(:,1), inside_track(:,2), 'k.', 'MarkerSize', 10);
-
-% Connect corresponding points with lines
-for i = 1:min(size(outside_track, 1), size(inside_track, 1))
-    plot([outside_track(i,1), inside_track(i,1)], [outside_track(i,2), inside_track(i,2)], 'k-');
-end
-
-for i = 1:1:length(track_points)-2
-    V_plot(i) = mean(velocity(i*interval-interval+1:i*interval));
-end
-pointsize = 5;
-scatter(track_points(1,2:end-1),track_points(2,2:end-1),100,V_plot,'marker','.')
-title('2019 Michigan Endurance Simulation Track Summary')
-
-grid on;
-hold off;
+% % Load the data from the Scaled sheet of the Excel file
+% filename = lap_coords;
+% outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
+% inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
+% 
+% % Remove NaN values (if present)
+% outside_track = outside_track(~any(isnan(outside_track), 2), :);
+% inside_track = inside_track(~any(isnan(inside_track), 2), :);
+% 
+% figure
+% hold on;
+% axis equal;
+% 
+% % Plot points for both tracks
+% plot(outside_track(:,1), outside_track(:,2), 'k.', 'MarkerSize', 10);
+% plot(inside_track(:,1), inside_track(:,2), 'k.', 'MarkerSize', 10);
+% 
+% % Connect corresponding points with lines
+% for i = 1:min(size(outside_track, 1), size(inside_track, 1))
+%     plot([outside_track(i,1), inside_track(i,1)], [outside_track(i,2), inside_track(i,2)], 'k-');
+% end
+% 
+% for i = 1:1:length(track_points)-2
+%     V_plot(i) = mean(velocity(i*interval-interval+1:i*interval));
+% end
+% pointsize = 5;
+% scatter(track_points(1,2:end-1),track_points(2,2:end-1),100,V_plot,'marker','.')
+% title('2019 Michigan Endurance Simulation Track Summary')
+% 
+% grid on;
+% hold off;

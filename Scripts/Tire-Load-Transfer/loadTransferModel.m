@@ -26,8 +26,8 @@ MR_F = 1.177; % wheel to shock travel
 MR_R = 1.168; % wheel to shock travel
 
 % Convert accelerations from Gs to lbf (assuming 1 G = 32.174 ft/s^2)
-A_long = A_long_g * 32.174;
-A_lat = A_lat_g * 32.174;
+% A_long = A_long_g * 32.174;
+% A_lat = A_lat_g * 32.174;
 
 % Calculate intermediate values
 a = CG_x; 
@@ -35,10 +35,10 @@ b = wheelbase - a;
 H = (CG_z - ((Z_RR - Z_RF) / wheelbase) * a - Z_RF) / 12; % ft distance between CG and Roll Axis 
 
 % Longitudinal and Lateral Load Transfer
-delta_Wx = CG_z * W * A_long / wheelbase; % lbf 
-delta_Wy_F = (A_lat * W / (trackwidth / 12)) * ((H * Kphi_F_max) / ...
+delta_Wx = CG_z * W * A_long_g / wheelbase; % lbf 
+delta_Wy_F = (A_lat_g * W / (trackwidth / 12)) * ((H * Kphi_F_max) / ...
     (Kphi_F_max + Kphi_R_max) + (b * Z_RF / (12 * wheelbase)));
-delta_Wy_R = (A_lat * W / (trackwidth / 12)) * ((H * Kphi_R_max) / ...
+delta_Wy_R = (A_lat_g * W / (trackwidth / 12)) * ((H * Kphi_R_max) / ...
     (Kphi_F_max + Kphi_R_max) + (a * Z_RR / (12 * wheelbase)));
 
 %% Initial Load Matrix

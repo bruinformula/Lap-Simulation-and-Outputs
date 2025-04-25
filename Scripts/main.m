@@ -1,11 +1,33 @@
 %% Section 1: Getting Longitudinal and Lateral Accelerations around Track
-endurance_coords = "../Endurance_Coordinates_1.xlsx";
+endurance_coords = "Endurance_Coordinates_1.xlsx";
 addpath('Lap-Simulation');
 [A_long_g, A_lat_g] = Lap_Sim(endurance_coords);
 
-%% Section 2
 
-addpath('Tire-Load-Transfer');
+%% Section 2: Plot Longitudinal & Lateral Accelerations
+
+N = numel(A_lat_g);      
+samples = 1:N;  % sample indices
+
+figure('Name','Accelerations','NumberTitle','off');
+
+% Longitudinal acceleration vs. sample #
+subplot(2,1,1);
+plot(samples, A_long_g, 'LineWidth',1.5);
+title('Longitudinal Acceleration','FontWeight','bold');
+xlabel('Sample #');
+ylabel('Acceleration (G)');
+
+% Lateral acceleration vs. sample #
+subplot(2,1,2);
+plot(samples, A_lat_g, 'LineWidth',1.5);
+title('Lateral Acceleration','FontWeight','bold');
+xlabel('Sample #');
+ylabel('Acceleration (G)');
+
+%% Section 3: Plotting Loads
+
+addpath('Scripts/Tire-Load-Transfer');
 
 % Determine number of samples
 N = numel(A_lat_g);                                  % number of data points based on vector length
@@ -55,3 +77,26 @@ plot(loads_RR,'LineWidth',1.5);                    % plot values vs. sample inde
 title('Rear Right','FontWeight','bold');            % add bold title
 xlabel('Sample #');                                  % label x-axis
 ylabel('Load (lbs)');                                % label y-axis
+
+N       = numel(A_long_g);
+samples = 1:N;                  % sample indices
+
+figure('Name','Accelerations','NumberTitle','off')
+
+% Longitudinal acceleration vs. sample #
+subplot(2,1,1)
+plot(samples, A_long_g, 'LineWidth',1.5)
+xlabel('Sample #')
+ylabel('Longitudinal accel (G)')
+title('Longitudinal Acceleration')
+
+% Lateral acceleration vs. sample #
+subplot(2,1,2)
+plot(samples, A_lat_g, 'LineWidth',1.5)
+xlabel('Sample #')
+ylabel('Lateral accel (G)')
+title('Lateral Acceleration')
+
+%% Plotting Roll Angles
+
+roll_angle = ((A_lat*W*H)/(Kphi_f_tot+Kphi_r_tot))*(180/pi);
