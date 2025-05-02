@@ -1,15 +1,12 @@
 function [acceleration, lateral_accel] = Lap_Sim(lap_coords)
 
-addpath("../../Data Files")
-%endurance_coordinates = append("../", endurance_coordinates); 
-
 % Jonathan Vogel
 % Clemson Formula SAE
 % Tradespace Analysis Project
 % 2019 Michigan Dynamic Event Lap Sim
 
-close all
-clc
+addpath("Data Files")
+%endurance_coordinates = append("../", endurance_coordinates); 
 
 % The purpose of this code is to evaluate the points-scoring capacity of a
 % virtual vehicle around the 2019 FSAE Michigan Dynamic Event Tracks
@@ -31,11 +28,9 @@ disp('Loading Tire Model')
 % First we load in the lateral tire force model, which is a Pacejka model
 % created by derek:
 
-global FZ0 LFZO LCX LMUX LEX LKX  LHX LVX LCY LMUY LEY LKY LHY LVY ...
-       LGAY Ltr LRES LGAZ LXAL LYKA LVYKA LS LSGKP  LSGAL LGYR KY
-load("A1654run21_MF52_Fy_GV12.mat')
+load("A1654run21_MF52_Fy_GV12.mat")
 % then load in coefficients for Magic Formula 5.2 Tire Model:
-load('A1654run21_MF52_Fy_12.mat')
+load("A1654run21_MF52_Fy_12.mat")
 
 % Next you load in the longitudinal tire model, which for now is just a
 % CSAPS spline fit to the TTC data
@@ -151,7 +146,8 @@ deltaf = 0;
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
 velocity = 15:5:30; % range of velocities at which sim will evaluate (ft/s)
 % radii = [15:10:155]; % range of turn radii at which sim will evaluate (ft)
-radii = [15:10:25]; % range of turn radii at which sim will evaluate (ft)
+radii = 85:10:105;
+% radii = :10:155; % range of turn radii at which sim will evaluate (ft)
 
 % First we will evaluate our Acceleration Capacity
 g = 1; % g is a gear indicator, and it will start at 1
@@ -1283,7 +1279,7 @@ radii = velocity_y.^2./lateralg/32.2;
 cornering = csaps(radii,velocity_y);
 %% Section 7: Load Endurance Track Coordinates
 disp('Loading Endurance Track Coordinates')
-[data text] = xlsread(lap_coords,'Scaled');
+[data, ~] = xlsread(lap_coords,'Scaled');
 
 % the coordinates are now contained within 'data'. This is a 5 column
 % matrix that contains a set of defined 'gates' that the car must mavigate
@@ -1373,7 +1369,7 @@ vehicle_path_EN = vehicle_path;
 Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
-[acceleration lateral_accel] = lap_information(xx, lap_coords);
+[acceleration, lateral_accel] = lap_information(xx, lap_coords);
 
 %% Section 12: Plotting
 % Load the data from the Scaled sheet of the Excel file

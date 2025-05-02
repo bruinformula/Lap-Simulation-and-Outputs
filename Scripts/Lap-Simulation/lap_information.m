@@ -1,14 +1,15 @@
 % function [lap_time time_elapsed velocity acceleration lateral_accel gear_counter path_length weights distance] = lap_information(path_positions)
 function [acceleration, lateral_accel] = lap_information(path_positions, lap_coords)
 
-global path_boundaries r_min r_max cornering accel grip deccel lateral...
+global path_boundaries r_min cornering accel deccel lateral...
     shift_points top_speed shift_time
 %% Generate vehicle trajectory
 % this is done the same way as in the main lap sim code so I will not
 % replicate that explanation here
 
 interval = 10;
-sections = 3000;
+% Tampering here
+sections = 30;
 path_positions(end+1) = path_positions(1);
 path_positions(end+1) = path_positions(2);
 VMAX = top_speed;
@@ -46,11 +47,11 @@ RT = RT(~isnan(RT));
 % travelled
 for i = 1:length(RT)
     segment(i) = i;
-    % r = max(r_min,RT(i));
-    r = RT(i);
+    r = max(r_min,RT(i));
+    % r = RT(i);
     % r = min(r,r_max);
     % 
-    % RT(i) = r;
+    RT(i) = r;
     Vmax(i) = min(VMAX,fnval(cornering,r));
     x1(i) = track_points(1,i+1);
     x2(i) = track_points(1,i+2);

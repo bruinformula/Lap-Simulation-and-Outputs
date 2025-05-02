@@ -99,4 +99,4 @@ title('Lateral Acceleration')
 
 %% Plotting Roll Angles
 
-roll_angle = ((A_lat*W*H)/(Kphi_f_tot+Kphi_r_tot))*(180/pi);
+%roll_angle = ((A_lat*W*H)/(Kphi_f_tot+Kphi_r_tot))*(180/pi);

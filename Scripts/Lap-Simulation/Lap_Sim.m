@@ -5,9 +5,6 @@ function [acceleration, lateral_accel] = Lap_Sim(lap_coords)
 % Tradespace Analysis Project
 % 2019 Michigan Dynamic Event Lap Sim
 
-close all
-clc
-
 addpath("Data Files")
 %endurance_coordinates = append("../", endurance_coordinates); 
 
@@ -31,8 +28,6 @@ disp('Loading Tire Model')
 % First we load in the lateral tire force model, which is a Pacejka model
 % created by derek:
 
-global FZ0 LFZO LCX LMUX LEX LKX  LHX LVX LCY LMUY LEY LKY LHY LVY ...
-       LGAY Ltr LRES LGAZ LXAL LYKA LVYKA LS LSGKP  LSGAL LGYR KY
 load("A1654run21_MF52_Fy_GV12.mat")
 % then load in coefficients for Magic Formula 5.2 Tire Model:
 load("A1654run21_MF52_Fy_12.mat")
@@ -151,8 +146,8 @@ deltaf = 0;
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
 velocity = 15:5:30; % range of velocities at which sim will evaluate (ft/s)
 % radii = [15:10:155]; % range of turn radii at which sim will evaluate (ft)
-radii = [15:10:55];
-% radii = 135:10:155; % range of turn radii at which sim will evaluate (ft)
+radii = 15:10:105;
+% radii = :10:155; % range of turn radii at which sim will evaluate (ft)
 
 % First we will evaluate our Acceleration Capacity
 g = 1; % g is a gear indicator, and it will start at 1
