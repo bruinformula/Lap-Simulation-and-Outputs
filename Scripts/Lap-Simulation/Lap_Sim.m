@@ -1,4 +1,4 @@
-function [acceleration, lateral_accel] = Lap_Sim(lap_coords)
+function [acceleration, lateral_accel, distance] = Lap_Sim(lap_coords)
 
 % Jonathan Vogel
 % Clemson Formula SAE
@@ -66,17 +66,17 @@ gearTot = gear(end)*finalDrive*primaryReduction;
 VMAX = floor(3.28*shiftpoint/(gearTot/tyreRadius*60/(2*pi)));
 T_lock = T_lock/100;
 powertrainpackage = {engineSpeed engineTq primaryReduction gear finalDrive shiftpoint drivetrainLosses};
+
 %% Section 3: Vehicle Architecture
 disp('Loading Vehicle Characteristics')
 % These are the basic vehicle architecture primary inputs:
-LLTD = 51.5; % Front lateral load transfer distribution (%)
+LLTD = 51; % Front lateral load transfer distribution (%)
 W = 660; % vehicle + driver weight (lbs)
-WDF = 50; % front weight distribution (%)
-cg = 13.2/12; % center of gravity height (ft)
-l = 60.5/12; % wheelbase (ft)
-twf = 46/12; % front track width (ft)
-twr = 44/12; % rear track width (ft)
-
+WDF = 44.754; % front weight distribution (%)
+cg = 10.5/12; % center of gravity height (ft)
+l = 61/12; % wheelbase (ft)
+twf = 48/12; % front track width (ft)
+twr = 48/12; % rear track width (ft)
 % some intermediary calcs you don't have to touch
 LLTD = LLTD/100;
 WDF = WDF/100;
@@ -91,26 +91,22 @@ disp('Loading Suspension Kinematics')
 % this section is actually optional. So if you set everything to zero, you
 % can essentially leave this portion out of the analysis. Useful if you are
 % only trying to explore some higher level relationships
-
 % Pitch and roll gradients define how much the car's gonna move around
-rg_f = 0; % front roll gradient (deg/g)
-rg_r = 0; % rear roll gradient (deg/g)
+rg_f = 1.15; % front roll gradient (deg/g)
+rg_r = 1.15; % rear roll gradient (deg/g)
 pg = 0; % pitch gradient (deg/g)
-WRF = 180; % front and rear ride rates (lbs/in)
-WRR = 180; 
-
+WRF = 113.1228; % front and rear ride rates (lbs/in)
+WRR = 101.9789;
 % then you can select your camber alignment
 IA_staticf = 0; % front static camber angle (deg)
 IA_staticr = 0; % rear static camber angle (deg)
-IA_compensationf = 10; % front camber compensation (%)
-IA_compensationr = 20; % rear camber compensation (%)
-
+IA_compensationf = 10; % front camber compensation (%), leave as default, not sure what value they are asking for
+IA_compensationr = 20; % rear camber compensation (%), leave as default, not sure what value they are asking for
 % lastly you can select your kingpin axis parameters
-casterf = 0; % front caster angle (deg)
-KPIf = 0; % front kingpin inclination angle (deg)
-casterr = 4.1568;
-KPIr = 0;
-
+casterf = 4; % front caster angle (deg)
+KPIf = 7.18; % front kingpin inclination angle (deg)
+casterr = 4;
+KPIr = 8.49;
 % intermediary calcs, plz ignore
 IA_staticf = deg2rad(IA_staticf); % front static camber angle (deg)
 IA_staticr = deg2rad(IA_staticr); % rear static camber angle (deg)
@@ -124,6 +120,8 @@ IA_roll_inducedf = asin(2/twf/12);
 IA_roll_inducedr = asin(2/twr/12);
 IA_gainf = IA_roll_inducedf*IA_compensationf;
 IA_gainr = IA_roll_inducedr*IA_compensationr;
+
+
 %% Section 5: Input Aero Parameters
 disp('Loading Aero Model')
 Cl = .0418; %279/418
@@ -1369,36 +1367,4 @@ vehicle_path_EN = vehicle_path;
 Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
-[acceleration, lateral_accel] = lap_information(xx, lap_coords);
-
-%% Section 12: Plotting
-% Load the data from the Scaled sheet of the Excel file
-filename = lap_coords;
-outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
-inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
-
-% Remove NaN values (if present)
-outside_track = outside_track(~any(isnan(outside_track), 2), :);
-inside_track = inside_track(~any(isnan(inside_track), 2), :);
-
-% Plot the tracks
-figure;
-hold on;
-axis equal;
-
-% Plot points for both tracks
-plot(outside_track(:,1), outside_track(:,2), 'k.', 'MarkerSize', 10);
-plot(inside_track(:,1), inside_track(:,2), 'k.', 'MarkerSize', 10);
-
-% Connect corresponding points with lines
-for i = 1:min(size(outside_track, 1), size(inside_track, 1))
-    plot([outside_track(i,1), inside_track(i,1)], [outside_track(i,2), inside_track(i,2)], 'k-');
-end
-
-% Add labels and title
-title('Endurance Track Coordinates');
-xlabel('X Coordinate');
-ylabel('Y Coordinate');
-
-grid on;
-hold off;
+[acceleration, lateral_accel, distance] = lap_information(xx);

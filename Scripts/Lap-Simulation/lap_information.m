@@ -1,15 +1,13 @@
 % function [lap_time time_elapsed velocity acceleration lateral_accel gear_counter path_length weights distance] = lap_information(path_positions)
-function [acceleration, lateral_accel] = lap_information(path_positions, lap_coords)
-
-global path_boundaries r_min cornering accel deccel lateral...
+function [acceleration, lateral_accel, distance] = lap_information(path_positions)
+global path_boundaries r_min r_max cornering accel grip deccel lateral...
     shift_points top_speed shift_time
 %% Generate vehicle trajectory
 % this is done the same way as in the main lap sim code so I will not
 % replicate that explanation here
 
-interval = 10;
-% Tampering here
-sections = 30;
+interval = 5;
+sections = 3000;
 path_positions(end+1) = path_positions(1);
 path_positions(end+1) = path_positions(2);
 VMAX = top_speed;
@@ -48,9 +46,7 @@ RT = RT(~isnan(RT));
 for i = 1:length(RT)
     segment(i) = i;
     r = max(r_min,RT(i));
-    % r = RT(i);
-    % r = min(r,r_max);
-    % 
+    r = min(r,r_max);
     RT(i) = r;
     Vmax(i) = min(VMAX,fnval(cornering,r));
     x1(i) = track_points(1,i+1);
@@ -281,9 +277,9 @@ end
 
 %% combine results
 VD = v_f-v_r;
-
+forw = find(VD>=0);
+back = find(VD<0);
 velocity = zeros(1,length(VD));
-
 t_elapsed = 0;
 classifier = [];
 for i = 1:1:length(VD)
@@ -329,36 +325,17 @@ weights = [t_t/summ t_b/summ t_c/summ];
 %figure
 %plot(distance,velocity)
 
-%% Plot Results
+%% Gear Counter
+for i = 1:1:length(velocity)
+V = velocity(i);
+    gears = find((shift_points-V)>0);
+    gear = gears(1)-1;
+gear_counter(i) = gear;
+end
+lap_time = t_elapsed;
 
-% % Load the data from the Scaled sheet of the Excel file
-% filename = lap_coords;
-% outside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'B3:C1000');
-% inside_track = readmatrix(filename, 'Sheet', 'Scaled', 'Range', 'D3:E1000');
-% 
-% % Remove NaN values (if present)
-% outside_track = outside_track(~any(isnan(outside_track), 2), :);
-% inside_track = inside_track(~any(isnan(inside_track), 2), :);
-% 
-% figure
-% hold on;
-% axis equal;
-% 
-% % Plot points for both tracks
-% plot(outside_track(:,1), outside_track(:,2), 'k.', 'MarkerSize', 10);
-% plot(inside_track(:,1), inside_track(:,2), 'k.', 'MarkerSize', 10);
-% 
-% % Connect corresponding points with lines
-% for i = 1:min(size(outside_track, 1), size(inside_track, 1))
-%     plot([outside_track(i,1), inside_track(i,1)], [outside_track(i,2), inside_track(i,2)], 'k-');
-% end
-% 
-% for i = 1:1:length(track_points)-2
-%     V_plot(i) = mean(velocity(i*interval-interval+1:i*interval));
-% end
-% pointsize = 5;
-% scatter(track_points(1,2:end-1),track_points(2,2:end-1),100,V_plot,'marker','.')
-% title('2019 Michigan Endurance Simulation Track Summary')
-% 
-% grid on;
-% hold off;
+for i = 1:1:length(lateral_accel)
+    index = floor((i-1)/interval)+1;
+    axis(i) = sign(KT(index));
+end
+lateral_accel = lateral_accel.*axis;
