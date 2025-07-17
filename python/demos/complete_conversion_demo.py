@@ -225,7 +225,12 @@ def load_and_plot_tracks():
     def load_track_safe(filename):
         """Safely load track coordinates."""
         try:
-            df = pd.read_excel(filename)
+            # Get the correct path to the Excel file
+            current_dir = os.path.dirname(__file__)
+            base_dir = os.path.dirname(os.path.dirname(current_dir))  # Go up two levels
+            filepath = os.path.join(base_dir, filename)
+            
+            df = pd.read_excel(filepath)
             
             # Find coordinate data
             for col_start in range(min(5, df.shape[1]-1)):

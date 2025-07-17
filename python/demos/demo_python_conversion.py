@@ -12,11 +12,12 @@ import matplotlib.pyplot as plt
 
 # Add the python directory to the path
 current_dir = os.path.dirname(__file__)
-python_dir = os.path.join(current_dir, 'python')
+python_dir = os.path.dirname(current_dir)  # Go up one level to python/
 sys.path.insert(0, python_dir)
 
 from lap_simulation.powertrain import PowertrainModel, powertrain_lapsim
 from lap_simulation.tire_model import TireModel
+from lap_simulation.output_utils import get_plot_path, print_save_message
 
 
 def demo_powertrain():
@@ -65,7 +66,9 @@ def demo_powertrain():
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('powertrain_demo.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('powertrain_demo.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
 
 
@@ -102,7 +105,9 @@ def demo_tire_model():
         plt.ylabel('Longitudinal Force [lbf]')
         plt.title('Tire Force vs Slip Ratio')
         plt.grid(True, alpha=0.3)
-        plt.savefig('tire_demo.png', dpi=300, bbox_inches='tight')
+        plot_path = get_plot_path('tire_demo.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        print_save_message(plot_path, 'plot')
         plt.show()
         
     except Exception as e:
@@ -178,7 +183,9 @@ def demo_ggv_concept():
     ax2.set_ylim(-1.5, 1.5)
     
     plt.tight_layout()
-    plt.savefig('ggv_demo.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('ggv_demo.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
 
 

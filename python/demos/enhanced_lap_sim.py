@@ -10,14 +10,16 @@ from scipy.ndimage import gaussian_filter1d
 from typing import Tuple
 import os
 import sys
+import matplotlib.pyplot as plt
 
 # Add the python directory to the path
 current_dir = os.path.dirname(__file__)
-python_dir = os.path.join(current_dir, 'python')
+python_dir = os.path.dirname(current_dir)  # Go up one level to python/
 sys.path.insert(0, python_dir)
 
 from lap_simulation.data_loader import DataManager
 from lap_simulation.lap_sim import VehicleConfig
+from lap_simulation.output_utils import get_plot_path, print_save_message
 
 
 def enhanced_lap_simulation(base_dir: str = ".") -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -236,7 +238,9 @@ if __name__ == "__main__":
     plt.yticks(np.arange(-2, 2.1, 0.5))
     
     plt.tight_layout()
-    plt.savefig('enhanced_acceleration_plots.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('enhanced_acceleration_plots.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
     
     print(f"Enhanced simulation complete!")

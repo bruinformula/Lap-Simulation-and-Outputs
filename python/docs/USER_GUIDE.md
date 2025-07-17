@@ -58,8 +58,61 @@ track_coords = "Autocross_Coordinates_2.xlsx"
 
 ## Customizing Simulations
 
+### Vehicle Configuration File
+The easiest way to modify vehicle parameters is through the dedicated `vehicle_config.py` file:
+
+```python
+# Open vehicle_config.py and modify parameters directly
+VEHICLE_MASS = 260.0  # Change from 280 to 260 kg
+CG_HEIGHT = 0.250     # Lower center of gravity
+TIRE_MF52_PARAMS = {
+    'mu': 2.0,        # Increase tire grip
+    'B': 15.0,        # Stiffer tire response
+    # ... other parameters
+}
+```
+
+### Quick Configuration Changes
+```python
+from vehicle_config import get_vehicle_config, get_powertrain_config
+
+# Get base configuration
+config = get_vehicle_config()
+
+# Modify specific parameters
+config['mass'] = 260  # kg
+config['cg_height'] = 0.250  # m
+config['tire_params']['mu'] = 2.0  # better grip
+
+# Use modified config in simulation
+```
+
+### Pre-defined Configurations
+The vehicle_config.py file includes several example configurations:
+
+```python
+# Lightweight configuration
+LIGHTWEIGHT_CONFIG = {
+    'mass': 250.0,
+    'cg_height': 0.250,
+    'drag_coefficient': 1.05
+}
+
+# High-downforce configuration  
+HIGH_DOWNFORCE_CONFIG = {
+    'downforce_coefficient': 3.2,
+    'drag_coefficient': 1.25
+}
+
+# Autocross-optimized configuration
+AUTOCROSS_CONFIG = {
+    'tire_params': {'mu': 2.0, 'B': 15.0},
+    'gear_ratios': [3.0, 2.2, 1.8, 1.5, 1.3, 1.15]
+}
+```
+
 ### Vehicle Parameters
-Modify vehicle configuration in `lap_simulation/lap_sim.py`:
+Modify vehicle configuration in `vehicle_config.py`:
 
 ```python
 vehicle_config = {
@@ -71,8 +124,27 @@ vehicle_config = {
 }
 ```
 
+### Configuration Testing
+Test different configurations:
+```bash
+python vehicle_config_demo.py  # Compare multiple configurations
+python vehicle_config.py       # Print current configuration summary
+```
+
+### Advanced Parameter Studies
+Run parameter sensitivity analyses:
+```python
+# Test different vehicle masses
+masses = [250, 260, 270, 280, 290, 300]  # kg
+for mass in masses:
+    config = get_vehicle_config()
+    config['mass'] = mass
+    results = run_simulation(config)
+    analyze_results(results)
+```
+
 ### Aerodynamics
-Adjust aerodynamic properties:
+Adjust aerodynamic properties in `vehicle_config.py`:
 ```python
 aero_config = {
     'frontal_area': 1.2,  # m² - frontal area
@@ -82,7 +154,7 @@ aero_config = {
 ```
 
 ### Engine/Powertrain
-Modify engine characteristics in `lap_simulation/powertrain.py`:
+Modify engine characteristics in `vehicle_config.py`:
 ```python
 engine_config = {
     'max_power': 75000,  # W - maximum power

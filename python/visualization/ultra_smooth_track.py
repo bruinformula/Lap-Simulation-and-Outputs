@@ -27,7 +27,9 @@ def ultra_smooth_track_plot():
     
     try:
         # Load track data from the Scaled sheet
-        base_dir = os.path.dirname(__file__)
+        # Get the parent directory where Excel files are located
+        current_dir = os.path.dirname(__file__)
+        base_dir = os.path.dirname(os.path.dirname(current_dir))  # Go up two levels
         endurance_coords = "Endurance_Coordinates_1.xlsx"
         filepath = os.path.join(base_dir, endurance_coords)
         track_data = load_track_coordinates(filepath)

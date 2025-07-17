@@ -16,7 +16,13 @@ from scipy.io import loadmat
 def load_endurance_coordinates():
     """Load endurance track coordinates from Excel file."""
     try:
-        df = pd.read_excel('Endurance_Coordinates_1.xlsx')
+        # Get the parent directory where Excel files are located
+        current_dir = os.path.dirname(__file__)
+        parent_dir = os.path.dirname(current_dir)
+        parent_dir = os.path.dirname(parent_dir)  # Go up two levels from visualization/
+        excel_path = os.path.join(parent_dir, 'Endurance_Coordinates_1.xlsx')
+        
+        df = pd.read_excel(excel_path)
         
         # The data structure shows x in column 'Unnamed: 1' and y in 'Unnamed: 2'
         # Starting from row 2 (index 2) after headers

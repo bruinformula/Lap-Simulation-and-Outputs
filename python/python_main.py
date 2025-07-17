@@ -3,24 +3,6 @@ Main Script - Python Lap Simulation
 ====================================
 
 Python conversion of the main.m MATLAB script.
-"""
-
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-import sys
-
-# Add the lap_simulation package to path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
-
-from lap_simulation import lap_sim
-
-
-"""
-Main Script - Python Lap Simulation
-====================================
-
-Python conversion of the main.m MATLAB script.
 Direct translation maintaining MATLAB structure and logic.
 """
 
@@ -28,6 +10,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
+
+# Import vehicle configuration
+from vehicle_config import get_vehicle_config, get_powertrain_config, print_vehicle_summary
+
+# Add the lap_simulation package to path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
+
+from lap_simulation import lap_sim
+from lap_simulation.output_utils import get_plot_path, get_data_path, print_save_message
 import pandas as pd
 from scipy.io import loadmat
 
@@ -40,10 +31,20 @@ from lap_simulation.lap_sim import lap_sim
 def main():
     """Main function to run lap simulation and plot results - matches main.m exactly."""
     
-    # Set up paths
-    base_dir = os.path.dirname(__file__)
+    # Set up paths - point to parent directory where Excel files are located
+    base_dir = os.path.dirname(os.path.dirname(__file__))
     
     print("Starting Python Lap Simulation...")
+    
+    # Print vehicle configuration summary
+    print_vehicle_summary()
+    
+    # Get configurations
+    vehicle_config = get_vehicle_config()
+    powertrain_config = get_powertrain_config()
+    
+    print("=" * 50)
+    print("SECTION 1: LAP SIMULATION")
     print("=" * 50)
     
     # Section 1: Getting Longitudinal and Lateral Accelerations around Track
@@ -51,6 +52,7 @@ def main():
     endurance_coords = "Endurance_Coordinates_1.xlsx"
     
     try:
+        # Pass configurations to simulation
         A_long_g, A_lat_g, distance = lap_sim(endurance_coords, base_dir)
         print(f"Lap simulation completed successfully!")
         print(f"Generated {len(A_lat_g)} data points")
@@ -95,7 +97,9 @@ def main():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(base_dir, 'acceleration_plots.png'), dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('acceleration_plots.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
     
     # Section 3: Plotting Loads
@@ -170,7 +174,9 @@ def main():
         plt.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('corner_loads.png', dpi=300, bbox_inches='tight')
+        plot_path = get_plot_path('corner_loads.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        print_save_message(plot_path, 'plot')
         plt.show()
         
     except Exception as e:
@@ -202,7 +208,9 @@ def main():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('acceleration_by_sample.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('acceleration_by_sample.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
     
     # Roll angle calculation (matches MATLAB Section at end)
@@ -243,7 +251,9 @@ def main():
     plt.ylabel('Roll Angle [degrees]')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig('roll_angles.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('roll_angles.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
     
     # Statistics summary
@@ -257,13 +267,13 @@ def main():
     print(f"Total distance: {distance[-1]:.1f} ft")
     
     # Save results to file
-    results_file = os.path.join(base_dir, 'simulation_results.csv')
+    results_file = get_data_path('simulation_results.csv')
     results_data = np.column_stack([distance, A_long_g, A_lat_g, roll_angle])
     np.savetxt(results_file, results_data, 
                delimiter=',', 
                header='Distance_ft,Longitudinal_Accel_g,Lateral_Accel_g,Roll_Angle_deg',
                comments='')
-    print(f"\nResults saved to: {results_file}")
+    print_save_message(results_file, 'data file')
 
 
 def plot_ggv_diagram():
@@ -303,7 +313,9 @@ def plot_ggv_diagram():
     ax2.axis('equal')
     
     plt.tight_layout()
-    plt.savefig('ggv_diagram.png', dpi=300, bbox_inches='tight')
+    plot_path = get_plot_path('ggv_diagram.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.show()
 
 
@@ -313,7 +325,8 @@ def plot_optimized_racing_track():
     
     try:
         # Load track data from the Scaled sheet directly
-        base_dir = os.path.dirname(__file__)
+        # Use the parent directory where Excel files are located
+        base_dir = os.path.dirname(os.path.dirname(__file__))
         endurance_coords = "Endurance_Coordinates_1.xlsx"
         filepath = os.path.join(base_dir, endurance_coords)
         
@@ -393,7 +406,9 @@ def plot_optimized_racing_track():
         plt.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig(os.path.join(base_dir, 'racing_track.png'), dpi=300, bbox_inches='tight')
+        plot_path = get_plot_path('racing_track.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        print_save_message(plot_path, 'plot')
         plt.show()
         
         print(f"Track plotted successfully with {len(racing_x)} points")
