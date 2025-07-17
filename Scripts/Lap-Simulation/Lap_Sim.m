@@ -5,7 +5,6 @@ function [acceleration, lateral_accel, distance] = Lap_Sim(lap_coords)
 % Tradespace Analysis Project
 % 2019 Michigan Dynamic Event Lap Sim
 
-addpath("Data Files")
 %endurance_coordinates = append("../", endurance_coordinates); 
 
 % The purpose of this code is to evaluate the points-scoring capacity of a
@@ -27,16 +26,19 @@ disp('Loading Tire Model')
 
 % First we load in the lateral tire force model, which is a Pacejka model
 % created by derek:
-
-load("A1654run21_MF52_Fy_GV12.mat")
-% then load in coefficients for Magic Formula 5.2 Tire Model:
-load("A1654run21_MF52_Fy_12.mat")
+% Use direct path from Scripts directory to Data Files
+if isfile('../Data Files/A1654run21_MF52_Fy_GV12.mat')
+    load('../Data Files/A1654run21_MF52_Fy_GV12.mat')
+    load('../Data Files/A1654run21_MF52_Fy_12.mat')
+else
+    error('Data files not found. Please ensure you are running from the Scripts directory.')
+end
 
 % Next you load in the longitudinal tire model, which for now is just a
 % CSAPS spline fit to the TTC data
 % find your pathname and filename for the tire you want to load in
 filename = 'Hoosier_R25B_18.0x7.5-10_FX_12psi.mat';
-load(filename)
+load(['../Data Files/' filename])
 
 tire_radius = 9.05/12; %ft
 % tyreRadius = tire_radius/3.28; % converts to meters - unused
@@ -247,9 +249,22 @@ grip = csaps(velocity,A_xr);
 % starting guess for lateral acceleration capacity at a given speed
 AYP = 1;
 disp('     Cornering Envelope')
+
+% Pre-allocate arrays for better performance
+n_radii = length(radii);
+steering = zeros(n_radii, 1);
+lateralg = zeros(n_radii, 1);
+Ugradient = zeros(n_radii, 1);
+velocity_y = zeros(n_radii, 1);
+
+% Performance optimizations: larger steps, better convergence criteria
+beta_step = 0.01;  % Increased from 0.0025 for faster convergence
+AYP_step = 0.02;   % Increased from 0.005 for faster convergence
+tolerance = 1e-4;  % Convergence tolerance
+
 % for cornering performance, it makes more sense to evaluate a set of
 % cornering radii, instead of speeds
-for turn = 1:1:length(radii)
+for turn = 1:1:n_radii
     % first define your vehicle characteristics:
         a = l*(1-WDF);
         b = l*WDF;
@@ -287,46 +302,41 @@ for turn = 1:1:length(radii)
         % compare to the initial guess
         diff_AY = A_y-AY;
         % vary the sideslip angle (B) until the initial guess and resultant
-        % AY match up
+        % AY match up - OPTIMIZED VERSION
         iter_count = 0;
-        while diff_AY < 0 && iter_count < 1000
-            beta = beta + .0025;
+        max_iters = 200;  % Reduced from 1000 for faster execution
+        
+        % First convergence loop - optimized with larger steps and tolerance
+        while abs(diff_AY) > tolerance && iter_count < max_iters
+            if diff_AY < 0
+                beta = beta + beta_step;
+            else
+                beta = beta - beta_step;
+            end
             A_y = V^2/R;
             [~, ~, ~, ~, ~, F_y, ~, M_z, AY, ~, ~] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
             diff_AY = A_y-AY; 
             iter_count = iter_count + 1;
         end
-        if iter_count >= 1000
-            warning('Maximum iterations reached in AY convergence loop 1');
-        end
-        iter_count = 0;
-        while diff_AY > 0 && iter_count < 1000
-            beta = beta - .0025;
-            A_y = V^2/R;
-            [~, ~, ~, ~, ~, F_y, ~, M_z, AY, ~, ~] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-            diff_AY = A_y-AY; 
-            iter_count = iter_count + 1;
-        end
-        if iter_count >= 1000
-            warning('Maximum iterations reached in AY convergence loop 2');
+        if iter_count >= max_iters
+            warning('Maximum iterations reached in AY convergence loop - consider increasing tolerance');
         end
         % at that point, check the yaw moment. Re-run the above loop^ but
         % this time, steer angle is being varied until moment comes out to
-        % zero-ish:
+        % zero-ish - OPTIMIZED VERSION:
         while M_z < 0 
             delta = delta+ddelta;
             beta = deg2rad(0);
             [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
             iter_count = 0;
-            while diff_AY < 0 && iter_count < 1000
-                beta = beta + .0025;
+            max_iters = 200;  % Reduced from 1000
+            while abs(diff_AY) > tolerance && iter_count < max_iters
+                if diff_AY < 0
+                    beta = beta + beta_step;
+                else
+                    beta = beta - beta_step;
+                end
                 [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-                iter_count = iter_count + 1;
-            end
-            iter_count = 0;
-            while diff_AY > 0 && iter_count < 1000
-                beta = beta - .0025;
-                [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr); 
                 iter_count = iter_count + 1;
             end
         end
@@ -335,51 +345,23 @@ for turn = 1:1:length(radii)
             beta = deg2rad(0);
             [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
             iter_count = 0;
-            while diff_AY < 0 && iter_count < 1000
-                beta = beta + .0025;
+            max_iters = 200;  % Reduced from 1000  
+            while abs(diff_AY) > tolerance && iter_count < max_iters
+                if diff_AY < 0
+                    beta = beta + beta_step;
+                else
+                    beta = beta - beta_step;
+                end
                 [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
                 iter_count = iter_count + 1;
-            end
-            iter_count = 0;
-            while diff_AY > 0 && iter_count < 1000
-                beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-                iter_count = iter_count + 1;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
             end
         end
         % then re run all of THAT, slowly increasing your AY guess 
         % until the front tire maxes out aka slip
         % angle of 12
+        % Main convergence loop - optimized for larger step and tolerance
         while a_f > deg2rad(-12)
-            AYP = AYP+.005;
+            AYP = AYP + AYP_step;  % Use larger step size from optimization
             a = l*(1-WDF);
             b = l*WDF;
             R = radii(turn);
@@ -422,107 +404,57 @@ for turn = 1:1:length(radii)
             M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
             AY = F_y/(W/32.2);
             diff_AY = A_y-AY;
-            while diff_AY < 0
-                beta = beta + .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
-            end
-            while diff_AY > 0
-                beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
-            end
-            %rad2deg([a_f a_r])
-            while M_z > 0 
-                delta = delta-ddelta;
-                beta = deg2rad(0);
-                [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
+            % Optimized convergence - use single loop with tolerance
+            iter_count = 0;
+            max_iters = 200;  % Reduced from potential infinite loop
+            while abs(diff_AY) > tolerance && iter_count < max_iters
+                if diff_AY < 0
+                    beta = beta + beta_step;
+                else
+                    beta = beta - beta_step;
                 end
-                while diff_AY > 0
-                    beta = beta - .0025;
-                    [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
-                end
+                [~, ~, ~, ~, ~, F_y, ~, M_z, AY, ~, ~] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
+                diff_AY = A_y-AY; 
+                iter_count = iter_count + 1;
             end
-            while M_z < 0 
-                delta = delta+ddelta;
-                beta = deg2rad(0);
-                [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    A_y = V^2/R;
+            % Update slip angles after convergence
+            r = A_y/V;
+            % Update slip angles after convergence
+            r = A_y/V;
+            a_f = beta+a*r/V-delta;
+            a_r = beta-b*r/V;
+        end
+        %rad2deg([a_f a_r])
+        while M_z > 0 
+            delta = delta-ddelta;
+            beta = deg2rad(0);
+            [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
+            % Optimized convergence loop
+            iter_count = 0;
+            max_iters = 200;
+            while abs(diff_AY) > tolerance && iter_count < max_iters
+                if diff_AY < 0
+                    beta = beta + beta_step;
+                else
+                    beta = beta - beta_step;
+                end
+                [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
+                iter_count = iter_count + 1;
+            end
+        end
+        while M_z < 0 
+            delta = delta+ddelta;
+            beta = deg2rad(0);
+            [F_fin, F_fout, F_rin, F_rout, F_x, F_y, M_z_diff, M_z, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
+            % Optimized convergence loop
+            iter_count = 0;
+            max_iters = 200;
+            while abs(diff_AY) > tolerance && iter_count < max_iters
+                if diff_AY < 0
+                    beta = beta + beta_step;
+                else
+                    beta = beta - beta_step;
+                end
                     WT = A_y*cg*W/mean([twf twr])/32.2/12;
                     WTF = WT*LLTD;
                     WTR = WT*(1-LLTD);
@@ -1052,8 +984,6 @@ end
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
 [acceleration, lateral_accel, distance] = lap_information(xx);
-
-end
 
 %% HELPER FUNCTIONS
 
