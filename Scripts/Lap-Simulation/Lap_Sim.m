@@ -39,7 +39,7 @@ filename = 'Hoosier_R25B_18.0x7.5-10_FX_12psi.mat';
 load(filename)
 
 tire_radius = 9.05/12; %ft
-tyreRadius = tire_radius/3.28; % converts to meters
+% tyreRadius = tire_radius/3.28; % converts to meters - unused
 
 % finally, we have some scaling factors for longitudinal (x) and lateral
 % (y) friction. You can use these to tune the lap sim to correlate better 
@@ -62,8 +62,8 @@ shift_time = .25; % seconds
 T_lock = 90; % differential locking torque (0 =  open, 1 = locked)
 
 % Intermediary Calcs/Save your results into the workspace
-gearTot = gear(end)*finalDrive*primaryReduction;
-VMAX = floor(3.28*shiftpoint/(gearTot/tyreRadius*60/(2*pi)));
+% gearTot = gear(end)*finalDrive*primaryReduction; % unused
+% VMAX = floor(3.28*shiftpoint/(gearTot/tyreRadius*60/(2*pi))); % unused
 T_lock = T_lock/100;
 powertrainpackage = {engineSpeed engineTq primaryReduction gear finalDrive shiftpoint drivetrainLosses};
 
@@ -80,12 +80,11 @@ twr = 44/12; % rear track width (ft)
 % some intermediary calcs you don't have to touch
 LLTD = LLTD/100;
 WDF = WDF/100;
-m = W/32.2; % mass (lbm)
+% m = W/32.2; % mass (lbm) - unused
 WF = W*WDF; % front weight
 WR = W*(1-WDF); % rear weight
-a = l*(1-WDF); % front axle to cg
-b = l*WDF; % rear axle to cg
-tw = twf;
+% a and b are calculated in the function calls where needed
+% tw = twf; % unused
 %% Section 4: Input Suspension Kinematics
 disp('Loading Suspension Kinematics')
 % this section is actually optional. So if you set everything to zero, you
@@ -138,7 +137,7 @@ CoP = CoP/100;
 disp('Generating g-g-V Diagram')
 
 deltar = 0;
-deltaf = 0;
+% deltaf = 0; % unused
 
 % NOTE: I'm tampering here
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
@@ -188,7 +187,7 @@ for  i = 1:1:length(velocity) % for each velocity
     % find max force capacity from each tire:
     fxf(find(abs(fxf) > 1000)) = [];
     fxr(find(abs(fxr) > 1000)) = [];
-    FXF = max(fxf);
+    % FXF = max(fxf); % unused
     FXR = max(fxr);
     % Calculate total tire tractive force (lbs)
     FX = abs(2*FXR);
@@ -206,7 +205,7 @@ for  i = 1:1:length(velocity) % for each velocity
         wr = wr+Ax*cg*WS/l/24;
         IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
         IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        FZ_vals = [-250:1:-50];
+        % FZ_vals = [-250:1:-50]; % unused
         sl = [0:.01:.11];
         for k = 1:length(sl)
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -214,7 +213,7 @@ for  i = 1:1:length(velocity) % for each velocity
         end
         fxf(find(abs(fxf) > 1000)) = [];
         fxr(find(abs(fxr) > 1000)) = [];
-        FXF = max(fxf);
+        % FXF = max(fxf); % unused
         FXR = max(fxr);
         FX = abs(2*FXR);
         AX = FX/W;
@@ -274,14 +273,15 @@ for turn = 1:1:length(radii)
         beta = deg2rad(0);
         A_y = V^2/R;
         % calculate lateral load transfer (lbs)
-        WT = A_y*cg*W/mean([twf twr])/32.2/12;
+        % WT = A_y*cg*W/mean([twf twr])/32.2/12; % calculated in function
         % calculate yaw rate
         r = A_y/V;
         % from yaw, sideslip and steer you can get slip angles
         a_f = beta+a*r/V-delta;
-        a_r = beta-b*r/V;
+        % a_r = beta-b*r/V; % calculated in function
         % with slip angles, load and camber, calculate lateral force at
         % the front
+        %#ok<*ASGLU> % Suppress unused variable warnings for function returns
         [~, ~, ~, ~, ~, F_y, ~, M_z, AY, ~, ~] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
         % calculate resultant lateral acceleration
         % compare to the initial guess
@@ -355,7 +355,6 @@ for turn = 1:1:length(radii)
                 wrout = wr+WTR;
                 [~, ~, ~, ~, ~, F_y, ~, ~, AY, A_y, diff_AY] = calculateVehicleDynamics(V, R, cg, W, twf, twr, LLTD, rg_f, rg_r, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, A, sf_y, Cd, grip, T_lock, wf, wr, casterr);
                 iter_count = iter_count + 1;
-                wrout = wr+WTR;
                 IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
                 IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
                 IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
@@ -667,7 +666,7 @@ for turn = 1:1:length(radii)
                 M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
                 AY = F_y/(W/32.2);
                 diff_AY = A_y-AY; 
-            end
+        end
         while diff_AY > 0
                 beta = beta - .0025;
                 A_y = V^2/R;
@@ -698,7 +697,7 @@ for turn = 1:1:length(radii)
                 M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
                 AY = F_y/(W/32.2);
                 diff_AY = A_y-AY; 
-            end
+        end
         %rad2deg([a_f a_r])
         while M_z < 0 
                 delta = delta+ddelta;
@@ -769,7 +768,7 @@ for turn = 1:1:length(radii)
                         diff_AY = -1;
                     end
                 end
-            end
+        end
         while M_z > 0 
                 delta = delta-ddelta;
                 beta = deg2rad(0);
@@ -864,15 +863,15 @@ for turn = 1:1:length(radii)
                     diff_AY = A_y-AY; 
                 end
         end
-        B = rad2deg(beta);
-        af = rad2deg(a_f);
-        ar = rad2deg(a_r);
+        % B = rad2deg(beta); % unused
+        % af = rad2deg(a_f); % unused
+        % ar = rad2deg(a_r); % unused
         steer = rad2deg(delta);
         UG = rad2deg(delta-l/R)*32.2/AY;
         Ugradient(turn) = UG;
         %F_lat = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*cos(delta);
         %F_drag = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*sin(delta);
-        skid = 2*pi*R/V;
+        % skid = 2*pi*R/V; % unused
         steering(turn) = steer;
         speed(turn) = V;
         lateralg(turn) = AY/32.2;
@@ -901,7 +900,7 @@ for  i = 1:1:length(velocity)
     wr = wr-Ax*cg*WS/l/24;
     IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
     IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-    FZ_vals = [-250:1:-50];
+    % FZ_vals = [-250:1:-50]; % unused
     sl = [-.15:.01:0];
     for k = 1:length(sl)
         fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -925,7 +924,7 @@ for  i = 1:1:length(velocity)
         wr = wr-Ax*cg*WS/l/24;
         IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
         IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        FZ_vals = [-250:1:-50];
+        % FZ_vals = [-250:1:-50]; % unused
         sl = [-.15:.01:0];
         for k = 1:length(sl)
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -949,12 +948,12 @@ r_max = max(radii);
 spcount = spcount+1;
 shift_points(spcount) = V+1;
 top_speed = V;
-VMAX = top_speed;
+% VMAX = top_speed; % unused
 
 % make the rest of your functions for the GGV diagram
 % braking as a function of speed
 deccel = csaps(velocity,A_X);
-velocity = 15:5:130;
+% velocity = 15:5:130; % unused - redefining velocity here would overwrite previous work
 % lateral g's as a function of velocity
 lateral = csaps(velocity_y,lateralg);
 radii = velocity_y.^2./lateralg/32.2;
@@ -976,13 +975,13 @@ disp('Loading Endurance Track Coordinates')
 % sort the data into "inside" and "outside" cones
 outside = data(:,2:3);
 inside = data(:,4:5);
-t = [1:length(outside)];
+% t = [1:length(outside)]; % unused
 % define the minimum turn radius of the car
 r_min = 4.5*3.28;
 tw = 46/12;
 r_min = r_min-tw/2;
-pp_out = spline(t,outside');
-pp_in = spline(t,inside');
+% pp_out = spline(t,outside'); % unused
+% pp_in = spline(t,inside'); % unused
 
 for i = 1:1:length(outside)
     % isolate individual gates
@@ -997,7 +996,7 @@ for i = 1:1:length(outside)
     coeff = polyfit([x1, x2], [y1, y2], 1);
     % adjust the width of the gate for the width of the car:
     gate_width = sqrt((x2-x1)^2+(y2-y1)^2);
-    path_width = gate_width-tw;
+    % path_width = gate_width-tw; % unused
     x_fs = tw/(2*gate_width);
     % update the gate boundaries based on said new width
     x_bound = [min(x1,x2)+x_fs*abs(x2-x1),max(x1,x2)-x_fs*abs(x2-x1)];
@@ -1045,11 +1044,11 @@ for i = 1:1:length(x)
     path_points(i,:) = [x3 y3];
 end
 
-x = linspace(1,t(end-1),1000);
-ppv = pchip(t,path_points');
-vehicle_path = ppval(ppv,x);
-vehicle_path_EN = vehicle_path;
-Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
+% x = linspace(1,t(end-1),1000); % unused
+% ppv = pchip(t,path_points'); % unused
+% vehicle_path = ppval(ppv,x); % unused
+% vehicle_path_EN = vehicle_path; % unused
+% Length = arclength(vehicle_path(1,:),vehicle_path(2,:)); % unused
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
 [acceleration, lateral_accel, distance] = lap_information(xx);
