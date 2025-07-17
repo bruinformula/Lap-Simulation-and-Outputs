@@ -50,13 +50,34 @@ TRACK_WIDTH_REAR = 1.118  # 44/12 ft = 3.667 ft = 1.118 m
 FRONTAL_AREA = 1.2
 
 # Drag coefficient [-] (from MATLAB: Cd = 0.0184)
-DRAG_COEFFICIENT = 0.0184
+# Realistic FSAE values: 0.7-1.5 with aero package, but using original for demo
+DRAG_COEFFICIENT = 0.0184  # Original MATLAB value
 
 # Downforce coefficient [-] (from MATLAB: Cl = 0.0418)
-DOWNFORCE_COEFFICIENT = 0.0418
+# Realistic FSAE values: 1.0-3.5 with aero package, but using original for demo
+DOWNFORCE_COEFFICIENT = 0.0418  # Original MATLAB value
 
 # Air density [kg/m³]
 AIR_DENSITY = 1.225
+
+# Aerodynamics enable/disable flag
+ENABLE_AERODYNAMICS = True
+
+# Alternative configurations for testing
+ORIGINAL_MATLAB_CONFIG = {
+    'drag_coefficient': 0.0184,    # Original MATLAB value
+    'downforce_coefficient': 0.0418   # Original MATLAB value
+}
+
+REALISTIC_FSAE_CONFIG = {
+    'drag_coefficient': 1.0,       # Realistic for FSAE with aero
+    'downforce_coefficient': 2.5   # Realistic for FSAE with wings
+}
+
+HIGH_DOWNFORCE_CONFIG = {
+    'drag_coefficient': 1.3,       # Higher drag penalty
+    'downforce_coefficient': 3.2   # High downforce setup
+}
 
 
 # =============================================================================
@@ -170,15 +191,50 @@ GRAVITY = 9.81
 # HELPER FUNCTIONS
 # =============================================================================
 
-def get_vehicle_config():
+def get_vehicle_config(enable_aero=None, aero_config=None):
     """
     Get complete vehicle configuration dictionary.
+    
+    Parameters:
+    -----------
+    enable_aero : bool, optional
+        Override aerodynamics enable/disable. If None, uses ENABLE_AERODYNAMICS constant.
+    aero_config : str or dict, optional
+        Aerodynamics configuration. Can be:
+        - 'original': Use original MATLAB values
+        - 'realistic': Use realistic FSAE values (default)
+        - 'high_downforce': Use high downforce configuration
+        - dict: Custom configuration with 'drag_coefficient' and 'downforce_coefficient'
     
     Returns:
     --------
     dict
         Complete vehicle configuration
     """
+    # Determine aerodynamics setting
+    aero_enabled = ENABLE_AERODYNAMICS if enable_aero is None else enable_aero
+    
+    # Determine aerodynamic coefficients
+    if not aero_enabled:
+        drag_coeff = 0.0
+        downforce_coeff = 0.0
+    else:
+        if aero_config == 'original':
+            drag_coeff = ORIGINAL_MATLAB_CONFIG['drag_coefficient']
+            downforce_coeff = ORIGINAL_MATLAB_CONFIG['downforce_coefficient']
+        elif aero_config == 'realistic':
+            drag_coeff = REALISTIC_FSAE_CONFIG['drag_coefficient']
+            downforce_coeff = REALISTIC_FSAE_CONFIG['downforce_coefficient']
+        elif aero_config == 'high_downforce':
+            drag_coeff = HIGH_DOWNFORCE_CONFIG['drag_coefficient']
+            downforce_coeff = HIGH_DOWNFORCE_CONFIG['downforce_coefficient']
+        elif isinstance(aero_config, dict):
+            drag_coeff = aero_config.get('drag_coefficient', DRAG_COEFFICIENT)
+            downforce_coeff = aero_config.get('downforce_coefficient', DOWNFORCE_COEFFICIENT)
+        else:  # Default to original MATLAB values (since that's what DRAG_COEFFICIENT is set to)
+            drag_coeff = DRAG_COEFFICIENT
+            downforce_coeff = DOWNFORCE_COEFFICIENT
+    
     return {
         # Mass properties
         'mass': VEHICLE_MASS,
@@ -194,9 +250,11 @@ def get_vehicle_config():
         
         # Aerodynamics
         'frontal_area': FRONTAL_AREA,
-        'drag_coefficient': DRAG_COEFFICIENT,
-        'downforce_coefficient': DOWNFORCE_COEFFICIENT,
+        'drag_coefficient': drag_coeff,
+        'downforce_coefficient': downforce_coeff,
         'air_density': AIR_DENSITY,
+        'aero_enabled': aero_enabled,
+        'aero_config': aero_config if aero_config else 'realistic',
         
         # Suspension
         'roll_center_front': ROLL_CENTER_FRONT,

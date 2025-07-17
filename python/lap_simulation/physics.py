@@ -56,7 +56,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from vehicle_config import get_vehicle_config, TIRE_MF52_PARAMS
 
 
-def calculate_realistic_velocities(x_coords, y_coords, track_type):
+def calculate_realistic_velocities(x_coords, y_coords, track_type, enable_aero=None, aero_config=None):
     """
     Calculate realistic velocities using MATLAB-inspired physics-based approach.
     
@@ -72,6 +72,10 @@ def calculate_realistic_velocities(x_coords, y_coords, track_type):
         Racing line coordinates in feet
     track_type : str
         Type of track ('endurance' or 'autocross')
+    enable_aero : bool, optional
+        Override aerodynamics enable/disable. If None, uses config default.
+    aero_config : str or dict, optional
+        Aerodynamics configuration ('original', 'realistic', 'high_downforce', or custom dict)
         
     Returns:
     --------
@@ -82,7 +86,7 @@ def calculate_realistic_velocities(x_coords, y_coords, track_type):
     velocities = np.zeros(n_points)
     
     # Get vehicle parameters for the specific track type
-    vehicle_params = get_vehicle_parameters(track_type)
+    vehicle_params = get_vehicle_parameters(track_type, enable_aero=enable_aero, aero_config=aero_config)
     
     # Calculate curvature at each point
     curvatures = calculate_track_curvature(x_coords, y_coords)
@@ -102,7 +106,7 @@ def calculate_realistic_velocities(x_coords, y_coords, track_type):
     return velocities
 
 
-def get_vehicle_parameters(track_type):
+def get_vehicle_parameters(track_type, enable_aero=None, aero_config=None):
     """
     Get vehicle parameters based on track type using vehicle_config.py values.
     
@@ -110,6 +114,10 @@ def get_vehicle_parameters(track_type):
     -----------
     track_type : str
         Type of track ('endurance' or 'autocross')
+    enable_aero : bool, optional
+        Override aerodynamics enable/disable. If None, uses config default.
+    aero_config : str or dict, optional
+        Aerodynamics configuration ('original', 'realistic', 'high_downforce', or custom dict)
         
     Returns:
     --------
@@ -117,7 +125,7 @@ def get_vehicle_parameters(track_type):
         Vehicle parameter dictionary
     """
     # Get base vehicle configuration from vehicle_config.py
-    config = get_vehicle_config()
+    config = get_vehicle_config(enable_aero=enable_aero, aero_config=aero_config)
     
     # Convert units and calculate derived parameters
     vehicle_params = {
@@ -135,6 +143,8 @@ def get_vehicle_parameters(track_type):
         'aero_cd': config['drag_coefficient'],
         'frontal_area': config['frontal_area'] * 10.764,  # m² to ft²
         'air_density': config['air_density'] * 0.00194,  # kg/m³ to slugs/ft³
+        'aero_enabled': config.get('aero_enabled', True),
+        'aero_config': config.get('aero_config', 'realistic'),
         
         # Performance limits (realistic estimates based on FSAE capabilities)
         'max_lat_accel': 1.4,  # realistic max lateral g's for FSAE
@@ -243,30 +253,35 @@ def calculate_max_cornering_speeds(curvatures, vehicle_params):
         if curvatures[i] > 0:
             radius = 1.0 / curvatures[i]
             
-            # Calculate downforce at estimated speed (iterative)
-            v_est = vehicle_params['base_speed'] * 5280 / 3600  # convert to ft/s for physics
+            # Iterative approach to find cornering speed with downforce
+            # Start with initial estimate
+            v_est_mph = vehicle_params['base_speed']
             
-            # Downforce calculation: F = 0.5 * ρ * Cl * A * v²
-            # Convert to proper units for imperial system
-            downforce_force = 0.5 * vehicle_params['air_density'] * vehicle_params['aero_cl'] * vehicle_params['frontal_area'] * v_est**2
-            downforce_lbs = downforce_force / 32.2  # convert force to equivalent mass in lbs
+            # Iterate a few times to converge on speed with downforce
+            for iteration in range(3):
+                v_est_fps = v_est_mph * 5280 / 3600  # convert to ft/s for physics
+                
+                # Downforce calculation: F = 0.5 * ρ * Cl * A * v²
+                # Convert to proper units for imperial system
+                downforce_force = 0.5 * vehicle_params['air_density'] * vehicle_params['aero_cl'] * vehicle_params['frontal_area'] * v_est_fps**2
+                downforce_lbs = downforce_force / 32.2  # convert force to equivalent mass in lbs
+                
+                # Effective weight including downforce (more downforce = more grip)
+                effective_weight = vehicle_params['mass'] + downforce_lbs
+                
+                # Maximum lateral acceleration from tire grip
+                max_lat_g = vehicle_params['max_lat_accel'] * vehicle_params['corner_factor']
+                max_lat_accel = max_lat_g * 32.2  # ft/s²
+                
+                # Scale by effective weight (more downforce = higher cornering speed)
+                weight_factor = effective_weight / vehicle_params['mass']
+                scaled_lat_accel = max_lat_accel * weight_factor
+                
+                # v = sqrt(a * r) for cornering
+                max_corner_speed_fps = np.sqrt(scaled_lat_accel * radius)
+                v_est_mph = max_corner_speed_fps * 3600 / 5280  # convert to mph
             
-            # Effective weight including downforce
-            effective_weight = vehicle_params['mass'] + downforce_lbs
-            
-            # Maximum lateral acceleration from tire grip
-            max_lat_g = vehicle_params['max_lat_accel'] * vehicle_params['corner_factor']
-            max_lat_accel = max_lat_g * 32.2  # ft/s²
-            
-            # Scale by effective weight (more downforce = higher cornering speed)
-            weight_factor = effective_weight / vehicle_params['mass']
-            scaled_lat_accel = max_lat_accel * weight_factor
-            
-            # v = sqrt(a * r) for cornering
-            max_corner_speed = np.sqrt(scaled_lat_accel * radius)
-            max_corner_speed_mph = max_corner_speed * 3600 / 5280  # convert to mph
-            
-            max_cornering_speeds[i] = max_corner_speed_mph
+            max_cornering_speeds[i] = v_est_mph
         else:
             # Straight section - no cornering limit, will be limited by acceleration/drag
             max_cornering_speeds[i] = float('inf')  # No artificial limit
