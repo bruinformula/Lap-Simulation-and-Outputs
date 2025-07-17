@@ -75,8 +75,8 @@ W = 660; % vehicle + driver weight (lbs)
 WDF = 44.754; % front weight distribution (%)
 cg = 10.5/12; % center of gravity height (ft)
 l = 61/12; % wheelbase (ft)
-twf = 48/12; % front track width (ft)
-twr = 48/12; % rear track width (ft)
+twf = 46/12; % front track width (ft)
+twr = 44/12; % rear track width (ft)
 % some intermediary calcs you don't have to touch
 LLTD = LLTD/100;
 WDF = WDF/100;
