@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from vehicle_config import get_vehicle_config, get_powertrain_config
 
 
 def lap_sim(lap_coords, base_dir):
@@ -144,15 +147,18 @@ def lap_sim(lap_coords, base_dir):
     # Section 11: Lap Information - matches MATLAB exactly
     print("Section 11: Calculating lap information...")
     
+    # Get vehicle configuration for simulation
+    vehicle_config = get_vehicle_config()
+    
     # This matches MATLAB: [acceleration, lateral_accel, distance] = lap_information(xx);
-    acceleration, lateral_accel, distance = lap_information(X_racing, Y_racing, distance)
+    acceleration, lateral_accel, distance = lap_information(X_racing, Y_racing, distance, vehicle_config)
     
     print(f"Simulation complete! Generated {len(acceleration)} data points")
     
     return acceleration, lateral_accel, distance
 
 
-def lap_information(X_racing, Y_racing, distance):
+def lap_information(X_racing, Y_racing, distance, vehicle_config=None):
     """
     Python equivalent of lap_information.m function
     
@@ -162,12 +168,18 @@ def lap_information(X_racing, Y_racing, distance):
         Racing line coordinates
     distance : array
         Distance along track
+    vehicle_config : dict, optional
+        Vehicle configuration parameters
         
     Returns:
     --------
     tuple : (acceleration, lateral_accel, distance)
         Acceleration data arrays
     """
+    
+    # Get vehicle configuration
+    if vehicle_config is None:
+        vehicle_config = get_vehicle_config()
     
     n_points = len(X_racing)
     
@@ -201,22 +213,22 @@ def lap_information(X_racing, Y_racing, distance):
         else:
             curvature[i] = 0
     
-    # Vehicle parameters (typical values for FSAE car)
-    mu = 1.5  # Tire coefficient of friction
-    g = 32.174  # ft/s^2
-    mass = 670 / g  # slugs (670 lbs / 32.174)
+    # Vehicle parameters from configuration
+    mu = vehicle_config['tire_params']['mu']  # Tire coefficient of friction
+    g = vehicle_config['gravity']  # m/s^2
+    mass_kg = vehicle_config['mass']  # kg
     
     # Maximum lateral acceleration based on tire grip
-    max_lat_accel = mu * g  # ft/s^2
+    max_lat_accel = mu * g  # m/s^2
     
     # Calculate maximum velocity for each corner based on lateral acceleration limit
     for i in range(n_points):
         if abs(curvature[i]) > 1e-6:  # Use absolute value for speed calculation
             # v = sqrt(a_lat / |curvature|) - speed depends on magnitude only
             max_velocity = np.sqrt(max_lat_accel / abs(curvature[i]))
-            velocity[i] = min(max_velocity, 100.0)  # Increased cap to 100 ft/s (~68 mph)
+            velocity[i] = min(max_velocity, vehicle_config['max_velocity'])  # Use config max velocity
         else:
-            velocity[i] = 100.0  # Higher straight line speed for more acceleration potential
+            velocity[i] = vehicle_config['max_velocity']  # Use config max velocity
     
     # Smooth velocity profile (but preserve acceleration opportunities)
     window = 3  # Reduced window to preserve more detail
@@ -227,7 +239,11 @@ def lap_information(X_racing, Y_racing, distance):
     # Apply realistic acceleration and braking constraints with powertrain limits
     max_accel_base = 1.2 * g  # 1.2g traction-limited acceleration
     max_brake = -1.8 * g  # 1.8g braking limit
-    max_power = 60 * 550  # 60 hp converted to ft-lb/s
+    
+    # Get powertrain configuration for power limits
+    powertrain_config = get_powertrain_config()
+    # Convert hp to watts: 1 hp = 745.7 watts
+    max_power_watts = 60 * 745.7  # Approximate power in watts
     
     # Forward pass: limit acceleration (including power limitations)
     for i in range(1, n_points):
@@ -235,8 +251,8 @@ def lap_information(X_racing, Y_racing, distance):
         if ds > 0:
             # Power-limited acceleration at higher speeds
             current_speed = velocity_smooth[i-1]
-            if current_speed > 20:  # Above ~14 mph, power becomes limiting
-                power_limited_accel = max_power / current_speed / (670/g)  # Force = Power/Speed, a = F/m
+            if current_speed > 7.5:  # Above ~7.5 m/s, power becomes limiting
+                power_limited_accel = max_power_watts / current_speed / mass_kg  # Force = Power/Speed, a = F/m
                 max_accel = min(max_accel_base, power_limited_accel)
             else:
                 max_accel = max_accel_base
@@ -300,39 +316,12 @@ def lap_information(X_racing, Y_racing, distance):
     return acceleration, lateral_accel, distance
 
 
-class VehicleConfig:
-    """Vehicle configuration parameters - matches MATLAB vehicle setup"""
-    
-    def __init__(self):
-        # Mass properties
-        self.mass = 670  # lbs
-        self.weight_dist_front = 0.52  # 52% front weight distribution
-        
-        # Dimensions
-        self.wheelbase = 61  # inches
-        self.track_width_front = 48  # inches
-        self.track_width_rear = 48  # inches
-        self.cg_height = 10.5  # inches
-        
-        # Aerodynamics
-        self.drag_coeff = 1.2
-        self.downforce_coeff = 2.8
-        self.frontal_area = 9.0  # sq ft
-        
-        # Tire properties
-        self.tire_radius = 9  # inches
-        self.mu_peak = 1.5
-        
-        # Powertrain
-        self.max_power = 60  # hp
-        self.max_torque = 55  # ft-lbs
-
-
 class LapSimulator:
     """Main lap simulation class - matches MATLAB Lap_Sim structure"""
     
-    def __init__(self, vehicle_config=None):
-        self.vehicle = vehicle_config or VehicleConfig()
+    def __init__(self, vehicle_config=None, powertrain_config=None):
+        self.vehicle = vehicle_config or get_vehicle_config()
+        self.powertrain = powertrain_config or get_powertrain_config()
         self.track_data = None
         self.racing_line = None
         
@@ -362,6 +351,7 @@ class LapSimulator:
         return lap_information(
             self.racing_line['x'], 
             self.racing_line['y'],
-            np.arange(len(self.racing_line['x']))
+            np.arange(len(self.racing_line['x'])),
+            self.vehicle  # Pass vehicle configuration
         )
 
