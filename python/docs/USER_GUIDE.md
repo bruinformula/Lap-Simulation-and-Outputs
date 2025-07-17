@@ -2,6 +2,49 @@
 
 This guide explains what the simulation does, the physics behind it, and how to interpret the results.
 
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+   - [Installation and First Run](#installation-and-first-run)
+
+2. [What the Simulation Does](#what-the-simulation-does)
+
+3. [The Physics Explained Simply](#the-physics-explained-simply)
+   - [Why Cars Need Lateral Acceleration in Turns](#1-why-cars-need-lateral-acceleration-in-turns)
+   - [Where Lateral Acceleration Comes From](#2-where-lateral-acceleration-comes-from)
+   - [Why Weight Shifts During Turns](#3-why-weight-shifts-during-turns)
+   - [Why the Car Body Rolls](#4-why-the-car-body-rolls)
+
+4. [Understanding the Output Plots](#understanding-the-output-plots)
+   - [Acceleration Plots](#acceleration-plots-acceleration_plotspng)
+   - [Corner Load Plots](#corner-load-plots-corner_loadspng)
+   - [Roll Angle Plots](#roll-angle-plots-roll_anglespng)
+
+5. [Vehicle Configuration Parameters](#vehicle-configuration-parameters)
+   - [Mass Properties](#mass-properties)
+   - [Suspension](#suspension)
+   - [Geometry](#geometry)
+
+6. [Advanced Usage](#advanced-usage)
+   - [Running Different Demonstrations](#running-different-demonstrations)
+   - [Creating Track Visualizations](#creating-track-visualizations)
+   - [Running Tests](#running-tests)
+
+7. [Common Physics Insights](#common-physics-insights)
+   - [Why Racing Cars Are Low and Wide](#why-racing-cars-are-low-and-wide)
+   - [Why Soft vs. Stiff Suspension](#why-soft-vs-stiff-suspension)
+   - [Why Weight Transfer Matters](#why-weight-transfer-matters)
+
+8. [Troubleshooting Unrealistic Results](#troubleshooting-unrealistic-results)
+
+9. [File Structure and Key Locations](#file-structure-and-key-locations)
+
+10. [What Makes This Simulation Realistic](#what-makes-this-simulation-realistic)
+
+11. [Next Steps](#next-steps)
+
+---
+
 ## Quick Start
 
 ### Installation and First Run
@@ -69,50 +112,47 @@ The car "leans" into turns because the springs and anti-roll bars resist the rol
 
 ## Understanding the Output Plots
 
+The simulation creates several plots that show different aspects of vehicle behavior:
+
 ### Acceleration Plots (`acceleration_plots.png`)
 
-**Longitudinal Acceleration (Blue Line)**:
-- **Positive values**: Car is accelerating (throttle on)
-- **Negative values**: Car is braking
-- **Zero values**: Car is coasting at constant speed
-- **Typical range**: -1.2g to +1.0g for a racing car
+**📈 Longitudinal Acceleration (Blue Line)**:
+- ✅ **Positive values**: Car is accelerating (throttle on)
+- 🔴 **Negative values**: Car is braking
+- ⚪ **Zero values**: Car is coasting at constant speed
+- 📊 **Typical range**: -1.2g to +1.0g for a racing car
 
-**Lateral Acceleration (Red Line)**:
-- **High values**: Car is in a tight turn
-- **Low values**: Car is on a straight section or gentle curve
-- **Typical range**: 0.8g to 1.5g for a racing car
-- **Physics source**: Track curvature and vehicle speed
+**📈 Lateral Acceleration (Red Line)**:
+- 🔵 **High values**: Car is in a tight turn
+- 🟢 **Low values**: Car is on a straight section or gentle curve
+- 📊 **Typical range**: 0.8g to 1.5g for a racing car
+- ⚙️ **Physics source**: Track curvature and vehicle speed
 
 ### Corner Load Plots (`corner_loads.png`)
 
 These show how much weight each wheel is supporting throughout the lap:
 
-**Front Left (FL)**: 
-- **Higher loads**: When turning right (weight shifts left) or braking (weight shifts forward)
-- **Lower loads**: When turning left or accelerating
+| Wheel Position | Higher Loads When | Lower Loads When |
+|----------------|-------------------|------------------|
+| **Front Left (FL)** | Turning right or braking | Turning left or accelerating |
+| **Front Right (FR)** | Turning left or braking | Turning right or accelerating |
+| **Rear Left (RL)** | Turning right or accelerating | Turning left or braking |
+| **Rear Right (RR)** | Turning left or accelerating | Turning right or braking |
 
-**Front Right (FR)**:
-- **Higher loads**: When turning left or braking
-- **Lower loads**: When turning right or accelerating
-
-**Rear Left (RL)**:
-- **Higher loads**: When turning right or accelerating (weight shifts back)
-- **Lower loads**: When turning left or braking
-
-**Rear Right (RR)**:
-- **Higher loads**: When turning left or accelerating
-- **Lower loads**: When turning right or braking
-
-**Typical Values**:
-- Static load per wheel ≈ 135 lbs (for 540 lb car)
-- During hard cornering: Outside wheels might see 180+ lbs, inside wheels might see 90 lbs
-- During hard braking: Front wheels gain load, rear wheels lose load
+**📊 Typical Load Values**:
+- 🏁 **Static load per wheel**: ≈ 135 lbs (for 540 lb car)
+- 🏎️ **Hard cornering**: Outside wheels 180+ lbs, inside wheels 90 lbs
+- 🛑 **Hard braking**: Front wheels gain load, rear wheels lose load
 
 ### Roll Angle Plots (`roll_angles.png`)
 
-**Positive angles**: Car is leaning to the right
-**Negative angles**: Car is leaning to the left
-**Typical values**: 1-3 degrees for a racing car with stiff suspension
+| Angle Value | Meaning | Typical Range |
+|-------------|---------|---------------|
+| **Positive angles** | Car leaning to the right | 1-3 degrees |
+| **Negative angles** | Car leaning to the left | 1-3 degrees |
+| **Zero** | Car upright (straight driving) | Racing cars with stiff suspension |
+
+---
 
 ## Vehicle Configuration Parameters
 
@@ -190,20 +230,45 @@ python testing/test_python_conversion.py
 
 ## Troubleshooting Unrealistic Results
 
-### If Accelerations Look Too High
-- Check vehicle mass (should be 200-300 kg for Formula SAE)
-- Check track curvature calculation (very sharp turns may have calculation errors)
-- Verify units (acceleration should be in g-force, typically < 2.0g)
+### 🚨 If Accelerations Look Too High
 
-### If Load Transfer Looks Wrong
-- Check center of gravity height (should be 0.25-0.4m for racing car)
-- Verify track width (should be 1.0-1.4m typically)
-- Check that loads sum to total vehicle weight
+| Issue | Likely Cause | Solution |
+|-------|--------------|----------|
+| Lateral acceleration > 2.0g | Track curvature calculation error | Check track coordinate data quality |
+| Longitudinal acceleration > 1.5g | Incorrect vehicle mass | Verify mass is 200-300 kg for Formula SAE |
+| Spiky acceleration traces | Unit conversion error | Check g-force calculations (÷ 32.2) |
 
-### If Roll Angles Look Unrealistic
-- Check roll stiffness values (should be 500-2000 Nm/rad for racing car)
-- Verify center of gravity height above roll center
-- Racing cars typically have < 3 degrees roll angle
+### ⚖️ If Load Transfer Looks Wrong
+
+| Issue | Check This | Expected Range |
+|-------|------------|----------------|
+| Loads don't sum to total weight | Unit conversions | Should equal vehicle weight |
+| Excessive load transfer | Center of gravity height | 0.25-0.4m for racing car |
+| Wrong transfer direction | Track width values | 1.0-1.4m typically |
+
+### 🔄 If Roll Angles Look Unrealistic
+
+| Issue | Check Parameter | Typical Values |
+|-------|-----------------|----------------|
+| Roll angle > 5 degrees | Roll stiffness values | 500-2000 Nm/rad |
+| No body roll at all | CG height above roll center | Should be > 0 |
+| Wrong roll direction | Lateral acceleration sign | Positive = right turn |
+
+### 🔧 General Debugging Steps
+
+1. **Verify Input Data**
+   - Check Excel file format and coordinates
+   - Ensure track data makes sense (no impossible geometry)
+
+2. **Check Units**
+   - Mass in kg, distances in meters
+   - Accelerations properly converted to g-force
+
+3. **Validate Physics**
+   - Compare results to known vehicle testing data
+   - Check that forces and moments balance
+
+---
 
 ## File Structure and Key Locations
 

@@ -2,6 +2,44 @@
 
 This document explains the specific equations used in the simulation and exactly where to find them in the code.
 
+## Table of Contents
+
+1. [Basic Physics Equations Used](#basic-physics-equations-used)
+   - [Lateral Acceleration from Track Curvature](#1-lateral-acceleration-from-track-curvature)
+   - [Track Curvature Calculation](#2-track-curvature-calculation)
+   - [Wheel Load Transfer During Cornering](#3-wheel-load-transfer-during-cornering)
+   - [Roll Angle Calculation](#4-roll-angle-calculation)
+   - [Magic Formula Tire Model](#5-magic-formula-tire-model)
+
+2. [Function Locations in Codebase](#function-locations-in-codebase)
+   - [Core Simulation Functions](#core-simulation-functions)
+   - [Physics Calculation Functions](#physics-calculation-functions)
+   - [Vehicle Configuration Functions](#vehicle-configuration-functions)
+   - [Data Loading Functions](#data-loading-functions)
+   - [Visualization Functions](#visualization-functions)
+   - [Output and Utility Functions](#output-and-utility-functions)
+
+3. [How Functions Work Together](#how-functions-work-together)
+   - [Main Simulation Workflow](#main-simulation-workflow)
+   - [Physics Function Chain](#physics-function-chain)
+   - [Data Flow](#data-flow)
+
+4. [Detailed Function Reference](#detailed-function-reference)
+   - [Main Simulation Functions](#main-simulation-functions-1)
+   - [Vehicle Configuration Functions](#vehicle-configuration-functions-1)
+   - [Physics Calculation Functions](#physics-calculation-functions-inline-in-mainpy)
+   - [Data Loading Functions](#data-loading-functions-1)
+   - [Visualization Functions](#visualization-functions-1)
+   - [Utility Functions](#utility-functions)
+
+5. [Function Dependencies](#function-dependencies)
+   - [Dependency Chain](#dependency-chain)
+   - [Data Flow Between Functions](#data-flow-between-functions)
+
+6. [How to Find Specific Calculations](#how-to-find-specific-calculations)
+
+---
+
 ## Basic Physics Equations Used
 
 ### 1. Lateral Acceleration from Track Curvature
@@ -94,104 +132,104 @@ def magic_formula_lateral(slip_angle, normal_load, tire_params):
 
 **What it means**: This is how tire engineers model tire behavior. The force builds up as you turn the wheel, reaches a peak, then drops off if you turn too hard.
 
+---
+
 ## Function Locations in Codebase
+
+This section provides the exact file locations for all functions used in the simulation.
 
 ### Core Simulation Functions
 
-#### `lap_sim(track_file, base_dir)`
-**File Location**: `lap_simulation/lap_sim.py`
-**Purpose**: Main lap simulation function that calculates accelerations for the entire track
-
-#### `main()`
-**File Location**: `main.py`
-**Purpose**: Entry point that runs the complete simulation and creates output plots
-
-#### `load_track_data_quiet()`
-**File Location**: `main.py`
-**Purpose**: Loads track data from Excel files without verbose logging
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `lap_sim(track_file, base_dir)` | `lap_simulation/lap_sim.py` | Main lap simulation function that calculates accelerations for the entire track |
+| `main()` | `main.py` | Entry point that runs the complete simulation and creates output plots |
+| `load_track_data_quiet()` | `main.py` | Loads track data from Excel files without verbose logging |
 
 ### Physics Calculation Functions
 
-#### `calculate_load_transfer()`
-**File Location**: `main.py` (implemented inline around line 150-180)
-**Purpose**: Calculates how weight shifts between wheels during cornering and braking
-
-#### `calculate_curvature()`
-**File Location**: `lap_simulation/lap_sim.py` (around line 30-40)
-**Purpose**: Computes track curvature from coordinate data using differential geometry
-
-#### `magic_formula_lateral()`
-**File Location**: `lap_simulation/tire_model.py`
-**Purpose**: Calculates lateral tire force using the Pacejka Magic Formula
-
-#### `calculate_roll_angle()`
-**File Location**: `main.py` (around line 240-260)
-**Purpose**: Computes vehicle body roll angle from lateral acceleration and suspension properties
+| Function | File Location | Line Range | Purpose |
+|----------|---------------|------------|---------|
+| `calculate_load_transfer()` | `main.py` | ~150-180 | Calculates how weight shifts between wheels during cornering and braking |
+| `calculate_curvature()` | `lap_simulation/lap_sim.py` | ~30-40 | Computes track curvature from coordinate data using differential geometry |
+| `magic_formula_lateral()` | `lap_simulation/tire_model.py` | ~20+ | Calculates lateral tire force using the Pacejka Magic Formula |
+| `calculate_roll_angle()` | `main.py` | ~240-260 | Computes vehicle body roll angle from lateral acceleration and suspension properties |
 
 ### Vehicle Configuration Functions
 
-#### `get_vehicle_config()`
-**File Location**: `vehicle_config.py`
-**Purpose**: Returns dictionary with all vehicle parameters (mass, geometry, suspension)
-
-#### `get_powertrain_config()`
-**File Location**: `vehicle_config.py`
-**Purpose**: Returns engine and transmission parameters
-
-#### `print_vehicle_summary()`
-**File Location**: `vehicle_config.py`
-**Purpose**: Displays vehicle configuration summary
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `get_vehicle_config()` | `vehicle_config.py` | Returns dictionary with all vehicle parameters (mass, geometry, suspension) |
+| `get_powertrain_config()` | `vehicle_config.py` | Returns engine and transmission parameters |
+| `print_vehicle_summary()` | `vehicle_config.py` | Displays vehicle configuration summary |
 
 ### Data Loading Functions
 
-#### `load_comprehensive_track_data()`
-**File Location**: `visualization/plot_racing_track.py`
-**Purpose**: Loads track coordinates and racing line data from multiple sources
-
-#### Data loading utilities
-**File Location**: `lap_simulation/data_loader.py`
-**Purpose**: Contains functions for loading Excel files and MATLAB .mat files
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `load_comprehensive_track_data()` | `visualization/plot_racing_track.py` | Loads track coordinates and racing line data from multiple sources |
+| Data loading utilities | `lap_simulation/data_loader.py` | Contains functions for loading Excel files and MATLAB .mat files |
 
 ### Visualization Functions
 
-#### `plot_track_with_velocity()`
-**File Location**: `visualization/plot_racing_track.py`
-**Purpose**: Creates track layout plots with velocity color coding
-
-#### `create_racing_line_plot()`
-**File Location**: `visualization/plot_racing_track.py`
-**Purpose**: Generates racing line visualization with track boundaries
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `plot_track_with_velocity()` | `visualization/plot_racing_track.py` | Creates track layout plots with velocity color coding |
+| `create_racing_line_plot()` | `visualization/plot_racing_track.py` | Generates racing line visualization with track boundaries |
 
 ### Output and Utility Functions
 
-#### `get_plot_path()` and `get_data_path()`
-**File Location**: `lap_simulation/output_utils.py`
-**Purpose**: Manages file paths for saving plots and data
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `get_plot_path()` and `get_data_path()` | `lap_simulation/output_utils.py` | Manages file paths for saving plots and data |
+| `save_simulation_results()` | `lap_simulation/output_utils.py` | Exports simulation data to CSV files |
 
-#### `save_simulation_results()`
-**File Location**: `lap_simulation/output_utils.py`
-**Purpose**: Exports simulation data to CSV files
+---
 
 ## How Functions Work Together
 
 ### Main Simulation Workflow
-1. **`main()`** in `main.py` → Entry point
-2. **`lap_sim()`** in `lap_simulation/lap_sim.py` → Core physics calculations
-3. **`calculate_curvature()`** in `lap_simulation/lap_sim.py` → Track geometry analysis
-4. **Load transfer calculations** in `main.py` → Weight distribution analysis
-5. **Roll angle calculations** in `main.py` → Body roll analysis
-6. **Plotting functions** in `main.py` → Generate output visualizations
+
+```mermaid
+graph TD
+    A[main.py] --> B[lap_sim.py]
+    B --> C[calculate_curvature]
+    B --> D[Load transfer calculations]
+    B --> E[Roll angle calculations]
+    B --> F[Plotting functions]
+```
+
+**Step-by-step process:**
+
+1. **Entry Point**: `main()` in `main.py`
+2. **Core Physics**: `lap_sim()` in `lap_simulation/lap_sim.py`
+3. **Track Analysis**: `calculate_curvature()` in `lap_simulation/lap_sim.py`
+4. **Weight Distribution**: Load transfer calculations in `main.py`
+5. **Body Dynamics**: Roll angle calculations in `main.py`
+6. **Output Generation**: Plotting functions in `main.py`
 
 ### Physics Function Chain
-1. Track coordinates → **`calculate_curvature()`** → Curvature values
-2. Curvature + velocity → **Lateral acceleration calculation** → g-force values
-3. Accelerations + vehicle config → **Load transfer calculation** → Individual wheel loads
-4. Lateral acceleration + suspension → **Roll angle calculation** → Body roll angles
+
+| Step | Input | Function | Output |
+|------|-------|----------|--------|
+| 1 | Track coordinates | `calculate_curvature()` | Curvature values |
+| 2 | Curvature + velocity | Lateral acceleration calculation | g-force values |
+| 3 | Accelerations + vehicle config | Load transfer calculation | Individual wheel loads |
+| 4 | Lateral acceleration + suspension | Roll angle calculation | Body roll angles |
 
 ### Data Flow
+
 ```
 Excel file → lap_sim() → [A_long_g, A_lat_g, distance] → main() → Plots + CSV output
 ```
+
+**Detailed data flow:**
+- 📊 **Input**: Excel file with track coordinates
+- ⚙️ **Processing**: `lap_sim()` calculates accelerations
+- 📈 **Analysis**: `main()` processes load transfer and roll angles
+- 📁 **Output**: PNG plots and CSV data files
+
+---
 ## Detailed Function Reference
 
 ### Main Simulation Functions
@@ -346,30 +384,62 @@ lap_simulation/lap_sim.py
 
 ## How to Find Specific Calculations
 
-### Track Curvature Calculation
+### Quick Reference Table
+
+| Calculation | File | Search Terms | Line Range |
+|-------------|------|--------------|------------|
+| **Track Curvature** | `lap_simulation/lap_sim.py` | `np.gradient`, `curvature` | ~30-40 |
+| **Lateral Acceleration** | `lap_simulation/lap_sim.py` | `lateral_acceleration`, `32.2` | ~45 |
+| **Load Transfer** | `main.py` | `lat_transfer`, `long_transfer` | ~150-180 |
+| **Roll Angle** | `main.py` | `roll_angle`, `Kphi` | ~240-260 |
+| **Vehicle Parameters** | `vehicle_config.py` | `get_vehicle_config` | N/A |
+
+### Detailed Search Guide
+
+#### 🔍 Track Curvature Calculation
 - **File**: `lap_simulation/lap_sim.py`
 - **Search for**: `np.gradient` or `curvature`
 - **Equation**: Differential geometry curvature formula
+- **Purpose**: Determines how sharp each turn is
 
-### Lateral Acceleration Calculation  
+#### 🔍 Lateral Acceleration Calculation  
 - **File**: `lap_simulation/lap_sim.py`
 - **Search for**: `lateral_acceleration` or `32.2`
 - **Equation**: Centripetal acceleration (a = v²κ)
+- **Purpose**: Calculates sideways force needed for each turn
 
-### Load Transfer Calculation
+#### 🔍 Load Transfer Calculation
 - **File**: `main.py`
 - **Search for**: `lat_transfer` or `long_transfer`
 - **Lines**: Around 150-180
+- **Purpose**: Determines weight distribution between wheels
 
-### Roll Angle Calculation
+#### 🔍 Roll Angle Calculation
 - **File**: `main.py` 
 - **Search for**: `roll_angle` or `Kphi`
 - **Lines**: Around 240-260
+- **Purpose**: Calculates how much the car body leans
 
-### Vehicle Parameters
+#### 🔍 Vehicle Parameters
 - **File**: `vehicle_config.py`
 - **Search for**: `get_vehicle_config` function
 - **Contains**: All mass, geometry, and suspension parameters
+- **Purpose**: Stores all physical properties of the vehicle
+
+---
+
+## Additional Resources
+
+### 📚 Related Documentation
+- [User Guide](USER_GUIDE.md) - Physics explanations and usage instructions
+- [Development Guide](DEVELOPMENT.md) - Contributing and extending the codebase
+- [README](../README.md) - Project overview and quick start
+
+### 🔧 Debugging Tips
+- Use `print()` statements to trace variable values
+- Check units carefully (especially g-force conversions)
+- Validate physics results against expected ranges
+- Use plotting to visualize intermediate calculations
 - `max_force`: Maximum tire force capability [N]
 
 **Returns:**
