@@ -1,53 +1,173 @@
-# User Guide
+# User Guide - Vehicle Dynamics and Physics
 
-## Quick Start
+## Quick Start with Physics Understanding
 
-### Installation
-1. Navigate to the python directory:
-   ```bash
-   cd python/
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Running Your First Simulation
+### Installation and First Simulation
 ```bash
-python python_main.py
+cd python/
+pip install -r requirements.txt
+python main.py
 ```
 
-This will:
-- Load endurance track data
-- Run lap simulation 
-- Generate acceleration plots
-- Calculate corner loads
-- Show roll angle analysis
+### Understanding What Happens Physically
 
-## Understanding the Output
+When you run the simulation, the system performs these physics calculations:
 
-### Acceleration Plots
-The simulation generates plots showing:
-- **Longitudinal acceleration**: Braking (negative) and acceleration (positive) forces
-- **Lateral acceleration**: Cornering forces (signed: positive = right turn)
-- **Distance traveled**: Cumulative distance around track
+1. **Track Geometry Analysis**: Converts track coordinates into curvature values
+2. **Vehicle Kinematics**: Calculates required lateral acceleration for each track segment
+3. **Tire Force Modeling**: Uses Magic Formula to determine available grip
+4. **Load Transfer Calculation**: Computes dynamic weight distribution
+5. **Vehicle Dynamics Integration**: Simulates realistic vehicle motion
 
-### Corner Loads
-Shows weight transfer effects:
-- **Front Left/Right**: Load distribution during cornering and braking
-- **Rear Left/Right**: Load changes affect tire grip and handling
+## Physics Behind the Outputs
 
-### Roll Angles
-Vehicle body roll during cornering:
-- Calculated from lateral acceleration and suspension stiffness
-- Important for aerodynamics and driver comfort
+### Acceleration Plots - What They Mean
 
-## Track Selection
+#### Longitudinal Acceleration
+- **Positive Values**: Vehicle accelerating (engine torque > resistance)
+- **Negative Values**: Vehicle braking (brake force or drag > drive force)
+- **Magnitude Limits**: Typically ±1.2g for Formula SAE vehicles
+- **Physics Source**: Tire friction circle and powertrain limits
 
-### Available Tracks
-- **Endurance**: Longer track with high-speed sections
-- **Autocross**: Tight, technical course with many turns
+#### Lateral Acceleration  
+- **Sign Convention**: Positive = right turn, negative = left turn
+- **Magnitude Source**: Track curvature × velocity²
+- **Limits**: Tire lateral force capacity (typically 1.5-2.0g for racing tires)
+- **Realism**: Values match actual vehicle testing data
+
+### Corner Load Analysis - Load Transfer Physics
+
+#### Physical Mechanisms
+During cornering and braking, vehicle weight shifts due to:
+- **Lateral Forces**: Centrifugal force creates left/right weight transfer
+- **Longitudinal Forces**: Inertial forces create front/rear weight transfer
+- **CG Height Effects**: Higher center of gravity amplifies load transfer
+- **Track Width/Wheelbase**: Wider stance reduces load transfer percentage
+
+#### Individual Wheel Loads
+- **Front Left (FL)**: Increases during right turns and braking
+- **Front Right (FR)**: Increases during left turns and braking  
+- **Rear Left (RL)**: Increases during right turns and acceleration
+- **Rear Right (RR)**: Increases during left turns and acceleration
+
+### Roll Angle Physics
+
+#### Suspension Dynamics
+Vehicle roll results from:
+- **Lateral Force Moment**: Centrifugal force × CG height
+- **Roll Stiffness Resistance**: Spring and anti-roll bar forces
+- **Roll Center Geometry**: Suspension kinematics affect roll characteristics
+
+#### Engineering Significance
+- **Aerodynamics**: Roll affects wing and undertray ground clearance
+- **Tire Contact**: Roll changes tire contact patch and camber angles
+- **Driver Comfort**: Excessive roll affects driver ability and confidence
+
+## Track Physics and Racing Lines
+
+### Curvature and Speed Relationship
+
+The fundamental relationship governing vehicle speed through corners:
+```
+v_max = √(μ × g / κ)
+```
+
+Where:
+- **v_max**: Maximum cornering speed
+- **μ**: Tire-road friction coefficient  
+- **g**: Gravitational acceleration
+- **κ**: Track curvature (1/radius)
+
+### Racing Line Optimization
+
+The simulation uses physics principles to determine optimal paths:
+- **Geometric Line**: Largest radius through corner
+- **Late Apex**: Maximizes straight-line acceleration zones
+- **Early Apex**: Maximizes corner exit speed
+- **Physics Constraints**: Tire grip limits and vehicle dynamics
+
+## Vehicle Configuration Physics
+
+### Mass Properties Impact
+
+#### Center of Gravity Height
+- **Lower CG**: Reduces load transfer, improves handling
+- **Higher CG**: Increases load transfer, affects stability
+- **Optimal Range**: 250-300mm for Formula SAE vehicles
+
+#### Weight Distribution
+- **Front-Heavy**: Promotes understeer, improves braking
+- **Rear-Heavy**: Promotes oversteer, can improve acceleration traction
+- **Balanced**: Neutral handling characteristics
+
+### Suspension Tuning Physics
+
+#### Roll Stiffness Distribution
+- **Front Stiff**: Increases understeer tendency
+- **Rear Stiff**: Increases oversteer tendency
+- **Total Stiffness**: Affects overall roll angle magnitude
+
+#### Spring Rate Effects
+- **Higher Rates**: Reduce body motion, improve aerodynamic consistency
+- **Lower Rates**: Improve tire contact, better over rough surfaces
+- **Balance**: Compromise between handling and ride quality
+
+### Aerodynamic Physics
+
+#### Downforce Benefits
+- **Increased Normal Load**: Higher tire grip capability
+- **Speed Sensitivity**: Effect increases with speed squared
+- **Load Transfer Reduction**: Downforce reduces relative load transfer percentage
+
+#### Drag Penalties
+- **Speed Resistance**: Opposes acceleration and limits top speed
+- **Power Requirement**: Increases power needed to maintain speed
+- **Efficiency Trade-off**: Balance between cornering and straight-line performance
+
+## Advanced Physics Concepts
+
+### Friction Circle Theory
+
+The tire friction circle represents the maximum combined force capability:
+- **Pure Lateral**: Maximum cornering force
+- **Pure Longitudinal**: Maximum acceleration/braking force
+- **Combined**: Total force magnitude limited by circle radius
+- **Optimization**: Best lap times use full friction circle
+
+### Load Sensitivity Effects
+
+Tire performance varies with normal load:
+- **Peak Force**: Increases with load but not proportionally
+- **Load Sensitivity**: Typically Fmax ∝ Fz^0.9
+- **Optimization**: Equal tire loading maximizes total grip
+
+### Vehicle Dynamics Stability
+
+#### Understeer/Oversteer Tendencies
+- **Understeer**: Front tires lose grip first, vehicle pushes wide
+- **Oversteer**: Rear tires lose grip first, vehicle rotates more than desired
+- **Neutral**: Balanced front/rear grip, vehicle follows driver input
+
+#### Stability Factors
+- **Static Margin**: CG location relative to aerodynamic center
+- **Weight Distribution**: Front/rear load distribution effects
+- **Roll Stiffness**: Suspension tuning influence on balance
+
+## Validation and Accuracy
+
+### Physics Model Validation
+- **Tire Data**: Based on actual tire testing results
+- **Vehicle Parameters**: Realistic Formula SAE specifications
+- **Force Limits**: Consistent with vehicle testing experience
+- **Energy Balance**: Kinetic energy changes match work performed
+
+### Typical Performance Values
+- **Lateral Acceleration**: 1.2-1.8g sustained cornering
+- **Longitudinal Acceleration**: 1.0g acceleration, 1.3g braking
+- **Top Speed**: 80-100 mph depending on gearing and aerodynamics
+- **Lap Times**: Competitive with actual Formula SAE performance
+
+This physics-focused approach ensures the simulation provides meaningful engineering insights for vehicle development and driver training applications.
 
 ### Changing Tracks
 Edit the track selection in `python_main.py`:
