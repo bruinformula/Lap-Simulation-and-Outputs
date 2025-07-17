@@ -19,6 +19,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from lap_simulation import lap_sim
 from lap_simulation.output_utils import get_plot_path, get_data_path, print_save_message
+from visualization.plot_racing_track import load_comprehensive_track_data, plot_comprehensive_track, plot_track_comparison
 import pandas as pd
 from scipy.io import loadmat
 
@@ -274,6 +275,54 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("ADDITIONAL VISUALIZATIONS")
     print("=" * 50)
+    print("Available visualizations:")
+    print("  🏁 Comprehensive track plots with velocity-colored racing lines")
+    print("  📊 Track comparison plots (if multiple tracks available)")
+    print("  🎯 g-g-V diagrams (placeholder for future implementation)")
+    
+    # Ask user if they want to create comprehensive track visualizations
+    user_input = input("\nCreate comprehensive track visualizations? (y/n): ").strip().lower()
+    if user_input == 'y' or user_input == 'yes':
+        print("\nCreating comprehensive track visualizations...")
+        print("This includes:")
+        print("  • Track boundaries and racing lines")
+        print("  • Velocity-colored racing lines")
+        print("  • Performance statistics")
+        print("  • Direction arrows and start/finish markers")
+        try:
+            # Load track data using the racing track module
+            print("🏁 Loading comprehensive track data...")
+            track_data = load_comprehensive_track_data()
+            
+            if track_data:
+                print(f"📊 Available tracks: {list(track_data.keys())}")
+                
+                # Plot endurance track if available
+                if 'endurance' in track_data:
+                    print("🏁 Plotting Endurance track with velocity data...")
+                    plot_comprehensive_track(track_data['endurance'], 'endurance',
+                                           'comprehensive_endurance_track.png')
+                
+                # Plot autocross track if available  
+                if 'autocross' in track_data:
+                    print("🏁 Plotting Autocross track with velocity data...")
+                    plot_comprehensive_track(track_data['autocross'], 'autocross',
+                                           'comprehensive_autocross_track.png')
+                
+                # Create track comparison if multiple tracks available
+                if len(track_data) >= 2:
+                    print("📊 Creating track comparison visualization...")
+                    plot_track_comparison(track_data, 'comprehensive_track_comparison.png')
+                    print("✅ Track comparison plot created!")
+                
+                print("✅ Comprehensive track visualizations complete!")
+                print("📊 Track plots saved to outputs/plots/ directory")
+            else:
+                print("⚠ No track data could be loaded")
+                
+        except Exception as e:
+            print(f"❌ Error creating track visualizations: {e}")
+            print("   Make sure track coordinate files are available")
     
     # Ask user if they want to create g-g-V diagram
     user_input = input("\nCreate g-g-V diagram? (y/n): ").strip().lower()
