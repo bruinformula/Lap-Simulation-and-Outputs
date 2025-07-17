@@ -65,9 +65,9 @@ python/
 
 Comprehensive documentation is available in the `docs/` directory:
 
-- **[User Guide](docs/USER_GUIDE.md)** - Start here for basic usage
+- **[User Guide](docs/USER_GUIDE.md)** - Start here for physics understanding and basic usage
 - **[Development Guide](docs/DEVELOPMENT.md)** - For developers and contributors  
-- **[API Reference](docs/API.md)** - Complete function documentation
+- **[API Reference](docs/API.md)** - Complete function documentation with equations
 - **[Documentation Index](docs/README.md)** - Full documentation overview
 
 ## Usage
