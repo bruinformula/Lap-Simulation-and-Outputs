@@ -1,4 +1,5 @@
 """
+Lap Simulation Package - Python Conversion from MATLAB
 ======================================================
 
 This package converts the MATLAB lap simulation code to Python while maintaining

@@ -36,6 +36,15 @@ python/
     └── ... (other plot files)
 ```
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **📖 [User Guide](docs/USER_GUIDE.md)** - Start here for basic usage
+- **🔧 [Development Guide](docs/DEVELOPMENT.md)** - For developers and contributors  
+- **📚 [API Reference](docs/API.md)** - Complete function documentation
+- **📋 [Documentation Index](docs/README.md)** - Full documentation overview
+
 ## Usage
 
 1. Install dependencies:
