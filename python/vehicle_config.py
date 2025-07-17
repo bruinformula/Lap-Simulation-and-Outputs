@@ -12,14 +12,14 @@ All parameters use metric units (kg, m, N, etc.) unless otherwise specified.
 # VEHICLE MASS PROPERTIES
 # =============================================================================
 
-# Total vehicle mass including driver [kg]
-VEHICLE_MASS = 280.0
+# Total vehicle mass including driver [kg] (from MATLAB: 660 lbs)
+VEHICLE_MASS = 299.37  # 660 lbs converted to kg
 
-# Center of gravity position from front axle [m]
-CG_X_POSITION = 0.856
+# Center of gravity position from front axle [m] (calculated from MATLAB WDF = 44.754%)
+CG_X_POSITION = 0.856  # This gives 44.754% front weight distribution with 1.55m wheelbase
 
-# Center of gravity height above ground [m]  
-CG_HEIGHT = 0.267
+# Center of gravity height above ground [m] (from MATLAB: 10.5/12 ft)  
+CG_HEIGHT = 0.267  # 10.5/12 ft = 0.875 ft = 0.267 m
 
 # Vehicle weight [N] (calculated from mass)
 VEHICLE_WEIGHT = VEHICLE_MASS * 9.81
@@ -29,31 +29,31 @@ VEHICLE_WEIGHT = VEHICLE_MASS * 9.81
 # VEHICLE DIMENSIONS
 # =============================================================================
 
-# Wheelbase - distance between front and rear axles [m]
-WHEELBASE = 1.55
+# Wheelbase - distance between front and rear axles [m] (from MATLAB: 61/12 ft)
+WHEELBASE = 1.55  # 61/12 ft = 5.083 ft = 1.55 m
 
-# Track width - distance between left and right wheels [m]
-TRACK_WIDTH = 1.22
+# Track width - distance between left and right wheels [m] (average of front/rear)
+TRACK_WIDTH = 1.143  # Average of front (1.168m) and rear (1.118m)
 
-# Front track width [m] (if different from rear)
-TRACK_WIDTH_FRONT = 1.22
+# Front track width [m] (from MATLAB: 46/12 ft)
+TRACK_WIDTH_FRONT = 1.168  # 46/12 ft = 3.833 ft = 1.168 m
 
-# Rear track width [m] (if different from front)
-TRACK_WIDTH_REAR = 1.22
+# Rear track width [m] (from MATLAB: 44/12 ft)
+TRACK_WIDTH_REAR = 1.118  # 44/12 ft = 3.667 ft = 1.118 m
 
 
 # =============================================================================
 # AERODYNAMICS
 # =============================================================================
 
-# Frontal area [m²]
+# Frontal area [m²] (estimated from MATLAB aerodynamic coefficients)
 FRONTAL_AREA = 1.2
 
-# Drag coefficient [-]
-DRAG_COEFFICIENT = 1.1
+# Drag coefficient [-] (from MATLAB: Cd = 0.0184)
+DRAG_COEFFICIENT = 0.0184
 
-# Downforce coefficient [-]
-DOWNFORCE_COEFFICIENT = 2.5
+# Downforce coefficient [-] (from MATLAB: Cl = 0.0418)
+DOWNFORCE_COEFFICIENT = 0.0418
 
 # Air density [kg/m³]
 AIR_DENSITY = 1.225
@@ -84,8 +84,8 @@ ROLL_STIFFNESS_REAR_TOTAL = ROLL_STIFFNESS_REAR_SPRINGS + ROLL_STIFFNESS_REAR_AR
 # TIRE PARAMETERS
 # =============================================================================
 
-# Tire radius [m]
-TIRE_RADIUS = 9.05/12/3.28  # converted from inches
+# Tire radius [m] (from MATLAB: 9.05/12 ft)
+TIRE_RADIUS = 0.230  # 9.05/12 ft = 0.754 ft = 0.230 m
 
 # Tire width [m]
 TIRE_WIDTH = 0.18
@@ -106,15 +106,19 @@ TIRE_MF52_PARAMS = {
     'Sv': 0.0          # Vertical shift [-]
 }
 
+# Tire scaling factors (from MATLAB: sf_x = 0.6, sf_y = 0.47)
+TIRE_SCALING_LONGITUDINAL = 0.6   # sf_x - longitudinal friction scaling
+TIRE_SCALING_LATERAL = 0.47       # sf_y - lateral friction scaling
+
 
 # =============================================================================
 # POWERTRAIN CONFIGURATION
 # =============================================================================
 
-# Engine speed range [RPM]
+# Engine speed range [RPM] (from MATLAB: 6200:100:14100)
 ENGINE_SPEED_RANGE = list(range(6200, 14200, 100))
 
-# Engine torque curve [N-m] corresponding to speed range
+# Engine torque curve [N-m] corresponding to speed range (from MATLAB)
 ENGINE_TORQUE_CURVE = [
     41.57, 42.98, 44.43, 45.65, 46.44, 47.09, 47.52, 48.58, 49.57, 50.41, 
     51.43, 51.48, 51, 49.311, 48.94, 48.66, 49.62, 49.60, 47.89, 47.91, 
@@ -126,22 +130,22 @@ ENGINE_TORQUE_CURVE = [
     39.83, 38.60, 38.46, 37.56, 36.34, 35.35, 33.75, 33.54, 32.63, 31.63
 ]
 
-# Primary reduction ratio [-]
-PRIMARY_REDUCTION = 76/36
+# Primary reduction ratio [-] (from MATLAB: 76/36)
+PRIMARY_REDUCTION = 76/36  # = 2.111
 
-# Transmission gear ratios [-]
+# Transmission gear ratios [-] (from MATLAB)
 GEAR_RATIOS = [33/12, 32/16, 30/18, 26/18, 30/23, 29/24]
 
-# Final drive ratio [-]
-FINAL_DRIVE_RATIO = 40/12
+# Final drive ratio [-] (from MATLAB: 40/12)
+FINAL_DRIVE_RATIO = 40/12  # = 3.333
 
-# Shift point [RPM]
+# Shift point [RPM] (from MATLAB: 14000)
 SHIFT_POINT = 14000
 
-# Drivetrain efficiency [-]
+# Drivetrain efficiency [-] (from MATLAB: 0.85)
 DRIVETRAIN_EFFICIENCY = 0.85
 
-# Shift time [seconds]
+# Shift time [seconds] (from MATLAB: 0.25)
 SHIFT_TIME = 0.25
 
 
