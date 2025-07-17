@@ -50,10 +50,6 @@ This document explains the specific equations used in the simulation and exactly
 - `a_lateral` = lateral acceleration (ft/s²)
 
 **Where to find it**: `lap_simulation/lap_sim.py` around line 45
-```python
-# This is the centripetal acceleration formula
-lateral_acceleration = velocity_squared * curvature / 32.2  # Convert to g-force
-```
 
 **What it means**: The faster you go or the tighter the turn, the more sideways force you need. If you need more force than the tires can provide, you slide off the track.
 
@@ -63,14 +59,6 @@ lateral_acceleration = velocity_squared * curvature / 32.2  # Convert to g-force
 - This calculates how sharp each turn is from the track coordinates
 
 **Where to find it**: `lap_simulation/lap_sim.py` around line 30
-```python
-dx = np.gradient(x_coords)  # x'
-dy = np.gradient(y_coords)  # y'
-d2x = np.gradient(dx)       # x''
-d2y = np.gradient(dy)       # y''
-
-curvature = np.abs(dx * d2y - dy * d2x) / (dx**2 + dy**2)**(3/2)
-```
 
 **What it means**: This tells us how sharp each part of the track is. Straight sections have curvature ≈ 0, tight hairpins have high curvature.
 
@@ -83,14 +71,6 @@ curvature = np.abs(dx * d2y - dy * d2x) / (dx**2 + dy**2)**(3/2)
 - `t` = track width (m)
 
 **Where to find it**: `main.py` around line 160
-```python
-# Calculate how much weight shifts from inside to outside wheels
-lat_transfer = A_lat_g[i] * vehicle_config['mass'] * 0.224809 * 0.3
-
-# Apply to individual wheels
-loads_FL[i] = base_load - lat_transfer  # Inside front loses weight
-loads_FR[i] = base_load + lat_transfer  # Outside front gains weight
-```
 
 **What it means**: When you turn, the car "leans" and weight shifts to the outside wheels. Higher center of gravity = more weight transfer.
 
@@ -102,10 +82,6 @@ loads_FR[i] = base_load + lat_transfer  # Outside front gains weight
 - `K_φ` = roll stiffness (Nm/rad)
 
 **Where to find it**: `main.py` around line 250
-```python
-# Calculate body roll during cornering
-roll_angle = ((A_lat_g * W * H) / (Kphi_f_tot + Kphi_r_tot)) * (180/np.pi)
-```
 
 **What it means**: Stiffer anti-roll bars reduce body roll. Too much roll affects how the tires contact the road.
 
@@ -119,16 +95,6 @@ roll_angle = ((A_lat_g * W * H) / (Kphi_f_tot + Kphi_r_tot)) * (180/np.pi)
 - `α` = slip angle (rad)
 
 **Where to find it**: `lap_simulation/tire_model.py` around line 20
-```python
-def magic_formula_lateral(slip_angle, normal_load, tire_params):
-    # Simplified version of the full Magic Formula
-    B = tire_params['B']
-    C = tire_params['C'] 
-    D = tire_params['D'] * normal_load
-    
-    lateral_force = D * np.sin(C * np.arctan(B * slip_angle))
-    return lateral_force
-```
 
 **What it means**: This is how tire engineers model tire behavior. The force builds up as you turn the wheel, reaches a peak, then drops off if you turn too hard.
 
@@ -188,6 +154,109 @@ This section provides the exact file locations for all functions used in the sim
 
 ## How Functions Work Together
 
+### Code Execution Flow When Running main.py
+
+When you execute `python main.py`, here's exactly what happens step by step:
+
+#### **Phase 1: Initialization (Lines ~25-50)**
+1. **Import Dependencies**: 
+   - Loads numpy, pandas, matplotlib for calculations and plotting
+   - Imports custom modules: `vehicle_config`, `lap_sim`, `output_utils`, `plot_racing_track`
+
+2. **Load Vehicle Configuration**:
+   - Calls `get_vehicle_config()` from `vehicle_config.py`
+   - Returns dictionary with mass (250 kg), CG height (0.3 m), track widths, roll stiffness values
+   - These parameters will be used throughout all physics calculations
+
+3. **Set Up File Paths**:
+   - Defines base directory for finding Excel track files
+   - Sets up paths to `Endurance_Coordinates_1.xlsx` and `Autocross_Coordinates_2.xlsx`
+
+#### **Phase 2: Core Physics Simulation (Lines ~50-80)**
+4. **Load Track Data**:
+   - Calls `load_track_data_quiet()` which internally calls `load_comprehensive_track_data()`
+   - Reads Excel file with X,Y coordinates of the track layout
+   - Validates data format and handles any missing points
+
+5. **Run Lap Simulation**:
+   - Calls `lap_sim(endurance_coords, base_dir)` from `lap_simulation/lap_sim.py`
+   - **Inside lap_sim()**: 
+     - Calculates track curvature using differential geometry: κ = |x'y'' - y'x''| / (x'² + y'²)^(3/2)
+     - Converts curvature to lateral acceleration: a_lateral = v² × κ
+     - Generates realistic longitudinal acceleration patterns
+     - Creates distance array for the entire track
+   - **Returns**: Three arrays - `A_long_g[]`, `A_lat_g[]`, `distance[]`
+
+#### **Phase 3: Load Transfer Analysis (Lines ~80-180)**
+6. **Calculate Individual Wheel Loads**:
+   - For each point around the track (loop through all array indices):
+     - **Base Load**: Each wheel starts with 1/4 of total vehicle weight
+     - **Lateral Transfer**: `lat_transfer = A_lat_g[i] × mass × 0.224809 × cg_height_factor`
+     - **Longitudinal Transfer**: `long_transfer = A_long_g[i] × mass × 0.224809 × cg_height_factor`
+     - **Individual Wheels**:
+       - Front Left: `base_load - lat_transfer + long_transfer`
+       - Front Right: `base_load + lat_transfer + long_transfer`
+       - Rear Left: `base_load - lat_transfer - long_transfer`
+       - Rear Right: `base_load + lat_transfer - long_transfer`
+
+#### **Phase 4: Roll Angle Calculations (Lines ~240-260)**
+7. **Calculate Vehicle Body Roll**:
+   - For each track point: `roll_angle = (A_lat_g × W × H) / (Kphi_front + Kphi_rear)`
+   - Uses lateral acceleration, vehicle weight, CG height, and total roll stiffness
+   - Converts from radians to degrees for practical interpretation
+
+#### **Phase 5: Data Visualization (Lines ~180-300)**
+8. **Generate Acceleration Plots**:
+   - Creates 2-panel subplot: longitudinal vs lateral acceleration
+   - Plots both arrays against distance traveled
+   - Saves as `acceleration_plots.png` using `get_plot_path()`
+
+9. **Generate Load Transfer Plots**:
+   - Creates 4-panel subplot showing individual wheel loads
+   - Each panel shows one wheel's load variation throughout the lap
+   - Saves as `corner_loads.png`
+
+10. **Generate Roll Angle Plots**:
+    - Single plot showing body roll angle vs distance
+    - Saves as `roll_angles.png`
+
+11. **Generate Track Layout Plots**:
+    - Calls plotting functions from `visualization/plot_racing_track.py`
+    - Creates track layout visualizations with velocity profiles
+
+#### **Phase 6: Data Export (Lines ~300+)**
+12. **Export Simulation Data**:
+    - Calls `save_simulation_results()` from `output_utils.py`
+    - Creates CSV file with all calculated data
+    - Includes metadata header with simulation parameters
+
+#### **Phase 7: Completion**
+13. **Print Summary**:
+    - Displays completion message with output file locations
+    - Shows key simulation statistics (max accelerations, total distance, etc.)
+
+### **Data Flow Summary**:
+```
+Excel Track File → lap_sim() → [Accelerations] → Load Transfer Calc → Individual Wheel Loads
+                                     ↓
+                               Roll Angle Calc → Body Roll Values
+                                     ↓
+                            Plotting Functions → PNG Files + CSV Export
+```
+
+### **Key Variables Throughout Execution**:
+- **`vehicle_config`**: Dictionary with all vehicle parameters (persistent throughout)
+- **`A_long_g[]`, `A_lat_g[]`, `distance[]`**: Core simulation results from lap_sim()
+- **`loads_FL[]`, `loads_FR[]`, `loads_RL[]`, `loads_RR[]`**: Individual wheel loads
+- **`roll_angle[]`**: Vehicle body roll angles
+- **File paths**: Generated by `get_plot_path()` and `get_data_path()` for consistent output
+
+### **Error Handling**:
+- Excel file loading failures trigger fallback data generation
+- Physics calculations include range validation
+- Plot generation includes directory creation and format verification
+- All file operations include error reporting
+
 ### Main Simulation Workflow
 
 ```mermaid
@@ -239,30 +308,89 @@ Excel file → lap_sim() → [A_long_g, A_lat_g, distance] → main() → Plots 
 **Line Range**: Approximately lines 25-300
 **Purpose**: Orchestrates the complete lap simulation process
 
-**What it does**:
-1. Loads vehicle configuration from `vehicle_config.py`
-2. Calls `lap_sim()` to calculate accelerations
-3. Calculates load transfer for all four wheels
-4. Calculates vehicle roll angles
-5. Creates and saves all output plots
+**What it does in detail**:
+1. **Initialize Configuration**: 
+   - Calls `get_vehicle_config()` to load all vehicle physical properties (mass, dimensions, suspension settings)
+   - Sets up base directory paths for finding Excel track data files
+   - Configures matplotlib plotting parameters for consistent output formatting
+
+2. **Run Core Simulation**:
+   - Calls `lap_sim()` with the endurance track coordinates Excel file
+   - Receives back three arrays: longitudinal acceleration, lateral acceleration, and distance
+   - Handles any simulation errors with fallback data generation for robustness
+
+3. **Calculate Load Transfer Effects**:
+   - For each point around the track, calculates how weight shifts between wheels
+   - Uses lateral acceleration to determine left/right weight transfer during cornering
+   - Uses longitudinal acceleration to determine front/rear weight transfer during acceleration/braking
+   - Applies proper sign conventions (outside wheels gain load in turns, front wheels gain load under braking)
+
+4. **Calculate Vehicle Roll Dynamics**:
+   - Computes body roll angle based on lateral acceleration and suspension stiffness
+   - Uses vehicle center of gravity height and roll stiffness values from configuration
+   - Converts from radians to degrees for intuitive interpretation
+
+5. **Generate Output Visualizations**:
+   - Creates acceleration plots showing longitudinal and lateral g-forces vs distance
+   - Generates 4-panel corner load plots showing individual wheel loads throughout the lap
+   - Produces roll angle plots showing vehicle body lean during cornering
+   - Saves all plots as high-quality PNG files in the outputs directory
 
 **Key Variables Created**:
-- `A_long_g[]` - Longitudinal acceleration array
-- `A_lat_g[]` - Lateral acceleration array  
-- `distance[]` - Distance traveled array
-- `loads_FL[]`, `loads_FR[]`, `loads_RL[]`, `loads_RR[]` - Individual wheel loads
+- `A_long_g[]` - Longitudinal acceleration array (positive = accelerating, negative = braking)
+- `A_lat_g[]` - Lateral acceleration array (magnitude indicates turn severity)
+- `distance[]` - Distance traveled array in feet
+- `loads_FL[]`, `loads_FR[]`, `loads_RL[]`, `loads_RR[]` - Individual wheel loads in pounds
+- `roll_angle[]` - Vehicle body roll angles in degrees
+
+**Physics Concepts Applied**:
+- Centripetal acceleration for lateral forces
+- Load transfer due to center of gravity height
+- Suspension roll dynamics and anti-roll bar effects
+- Proper vehicle dynamics sign conventions
 
 #### `lap_sim(endurance_coords, base_dir)` - Core Physics Engine
 **File Location**: `lap_simulation/lap_sim.py`
-**Purpose**: Calculates vehicle accelerations from track geometry
+**Purpose**: Calculates vehicle accelerations from track geometry using fundamental physics
 
-**Physics Implementation**:
-1. **Load track coordinates** from Excel file
-2. **Calculate track curvature** using differential geometry
-3. **Determine lateral acceleration** from centripetal force equation
-4. **Generate realistic longitudinal acceleration** based on track sections
+**Detailed Process**:
+1. **Data Import and Validation**:
+   - Reads Excel file containing X,Y track coordinates using pandas
+   - Validates data format and handles missing values
+   - Ensures coordinate arrays are properly formatted for mathematical operations
 
-**Returns**: `(A_long_g, A_lat_g, distance)` - Three arrays with acceleration and distance data
+2. **Track Geometry Analysis**:
+   - Calculates first derivatives (dx, dy) using numpy gradient function
+   - Computes second derivatives (d2x, d2y) for curvature calculation
+   - Applies differential geometry formula: κ = |x'y'' - y'x''| / (x'² + y'²)^(3/2)
+   - Handles numerical edge cases and smooths noisy data
+
+3. **Lateral Acceleration Calculation**:
+   - Uses centripetal acceleration formula: a_lateral = v² × κ
+   - Assumes constant velocity profile (can be enhanced with speed optimization)
+   - Converts from ft/s² to g-force units by dividing by 32.2
+   - Ensures physically realistic values (typically 0.8-1.5g for racing)
+
+4. **Longitudinal Acceleration Generation**:
+   - Creates realistic acceleration patterns based on track sections
+   - Adds braking zones before corners and acceleration zones after corners
+   - Applies random variations to simulate realistic driving patterns
+   - Maintains proper sign conventions (positive = acceleration, negative = braking)
+
+5. **Distance Array Creation**:
+   - Calculates cumulative distance around the track
+   - Uses Euclidean distance between coordinate points
+   - Provides reference for plotting and analysis
+
+**Returns**: 
+- `A_long_g` - Array of longitudinal accelerations in g-force
+- `A_lat_g` - Array of lateral accelerations in g-force  
+- `distance` - Array of distances in feet
+
+**Mathematical Foundation**:
+- Differential geometry for curvature calculation
+- Kinematics for acceleration relationships
+- Proper coordinate system transformations
 
 ### Vehicle Configuration Functions
 
@@ -270,94 +398,396 @@ Excel file → lap_sim() → [A_long_g, A_lat_g, distance] → main() → Plots 
 **File Location**: `vehicle_config.py`
 **Returns**: Dictionary with vehicle physical properties
 
-**Key Parameters**:
-```python
-{
-    'mass': 250,           # kg - Total vehicle mass
-    'weight': 2452,        # N - Vehicle weight (mass × 9.81)
-    'cg_height': 0.3,      # m - Center of gravity height
-    'wheelbase': 1.6,      # m - Distance between axles
-    'track_width_front': 1.2,  # m - Front track width
-    'track_width_rear': 1.2,   # m - Rear track width
-}
-```
+**Detailed Explanation**:
+This function returns a comprehensive dictionary containing all the physical parameters needed to model a Formula SAE vehicle. Each parameter directly affects the physics calculations.
+
+**Complete Parameter Set**:
+- **Mass Properties**: Total vehicle mass (250 kg), weight in Newtons (2452 N)
+- **Geometry**: CG height (0.3 m), wheelbase (1.6 m), track widths (1.2 m front/rear)
+- **Suspension**: Roll stiffness values for front (1000 Nm/rad) and rear (800 Nm/rad)
+- **Aerodynamics**: Drag coefficient (1.2), frontal area (1.5 m²), downforce coefficient (2.0)
+
+**How These Parameters Affect Physics**:
+- **Mass**: Directly proportional to all forces (F = ma)
+- **CG Height**: Higher CG = more load transfer and body roll
+- **Track Width**: Wider track = less lateral load transfer per g of acceleration
+- **Wheelbase**: Affects longitudinal load transfer distribution
+- **Roll Stiffness**: Higher values reduce body roll but may hurt tire contact
+
+**Usage in Calculations**:
+- Load transfer formulas use mass, CG height, and track width
+- Roll angle calculations use roll stiffness values
+- Aerodynamic forces use drag and downforce coefficients
 
 #### `get_powertrain_config()` - Engine Parameters  
 **File Location**: `vehicle_config.py`
 **Purpose**: Provides engine and transmission specifications for powertrain modeling
 
+**Detailed Parameter Set**:
+- **Engine**: Max power (85 hp), max torque (75 lb-ft), redline (10000 RPM), idle (1200 RPM)
+- **Transmission**: Final drive ratio (3.5), gear ratios [2.8, 2.0, 1.5, 1.2, 1.0], shift point (9500 RPM)
+- **Drivetrain**: Overall efficiency (85%), differential type (open)
+
+**How These Affect Performance**:
+- **Power/Torque**: Determines maximum acceleration capability
+- **Gear Ratios**: Affect acceleration vs top speed trade-offs
+- **Drivetrain Efficiency**: Real losses in power transmission
+- **Shift Points**: Optimize acceleration for track characteristics
+
+**Future Enhancement Possibilities**:
+- Engine torque curves for more realistic modeling
+- Gear shift strategy optimization
+- Clutch and differential modeling
+
 ### Physics Calculation Functions (Inline in main.py)
 
 #### Load Transfer Calculations
 **File Location**: `main.py` lines ~150-180
-**Equations Used**:
-```python
-# Base load per wheel (static condition)
-base_load = vehicle_config['weight'] / 4.0 * 0.224809
+**Purpose**: Calculates how vehicle weight redistributes between wheels during dynamic maneuvers
 
-# Lateral load transfer (cornering)
-lat_transfer = A_lat_g[i] * vehicle_config['mass'] * 0.224809 * 0.3
+**Detailed Physics Process**:
 
-# Longitudinal load transfer (acceleration/braking)  
-long_transfer = A_long_g[i] * vehicle_config['mass'] * 0.224809 * 0.2
+1. **Static Load Distribution**:
+   - Each wheel carries 1/4 of total weight when stationary
+   - Assumes even weight distribution (realistic for Formula SAE)
+   - Conversion factor 0.224809 converts Newtons to pounds-force
 
-# Individual wheel loads
-loads_FL[i] = base_load - lat_transfer + long_transfer
-loads_FR[i] = base_load + lat_transfer + long_transfer
-loads_RL[i] = base_load - lat_transfer - long_transfer
-loads_RR[i] = base_load + lat_transfer - long_transfer
-```
+2. **Lateral Load Transfer (Cornering)**:
+   - Weight shifts from inside to outside wheels during turns
+   - Centripetal force creates a moment about the vehicle roll center
+   - Higher center of gravity = larger moment arm = more weight transfer
+   - Outside wheels gain load, inside wheels lose load
+   - Critical for understanding tire grip limits and handling balance
+
+3. **Longitudinal Load Transfer (Acceleration/Braking)**:
+   - Weight shifts from rear to front during braking, front to rear during acceleration
+   - Inertial forces create moments about the vehicle pitch center
+   - Front wheels gain load under braking (weight "shifts forward")
+   - Rear wheels gain load under acceleration (weight "shifts backward")
+   - Affects braking performance and traction-limited acceleration
+
+4. **Individual Wheel Load Calculation**:
+   - Combines static load with dynamic transfers for each wheel
+   - Front Left: base_load - lat_transfer + long_transfer
+   - Front Right: base_load + lat_transfer + long_transfer
+   - Rear Left: base_load - lat_transfer - long_transfer
+   - Rear Right: base_load + lat_transfer - long_transfer
+
+**Sign Convention Explanation**:
+- **Positive lateral acceleration**: Right turn → Right wheels gain load (+), Left wheels lose load (-)
+- **Positive longitudinal acceleration**: Accelerating → Rear wheels gain load (+), Front wheels lose load (-)
+- **Negative longitudinal acceleration**: Braking → Front wheels gain load (+), Rear wheels lose load (-)
+
+**Real-World Implications**:
+- Unloaded wheels have reduced grip
+- Overloaded wheels can exceed tire capacity
+- Load transfer affects suspension geometry and camber angles
+- Critical for setup optimization and safety analysis
 
 #### Roll Angle Calculations
 **File Location**: `main.py` lines ~240-260
-**Equation Used**:
-```python
-# Roll angle from lateral acceleration and suspension stiffness
-roll_angle = ((A_lat_g * W * H) / (Kphi_f_tot + Kphi_r_tot)) * (180/np.pi)
+**Purpose**: Calculates vehicle body roll angle during cornering maneuvers
+
+**Detailed Physics Implementation**:
+
+1. **Roll Moment Calculation**:
+   - Lateral acceleration creates inertial force at center of gravity
+   - Distance from CG to roll center creates moment arm
+   - This moment tries to roll the vehicle body
+
+2. **Total Roll Stiffness**:
+   - Combined front and rear anti-roll bar stiffness
+   - Components include anti-roll bars, spring rates, suspension compliance, tire sidewall stiffness
+
+3. **Roll Angle Calculation**:
+   - Roll angle calculated from moment equilibrium
+   - Converts from radians to degrees for practical interpretation
+
+**Engineering Significance**:
+- **Tire Contact**: Excessive roll affects tire contact patch
+- **Aerodynamics**: Body roll changes aerodynamic balance
+- **Driver Feel**: Roll affects driver confidence and lap times
+- **Setup Tool**: Used to optimize anti-roll bar settings
+
+**Typical Values**:
+- Formula SAE: 1-3 degrees in high-speed corners
+- Road cars: 3-8 degrees depending on suspension tuning
+- Race cars with stiff anti-roll bars: < 2 degrees
+
+**Trade-offs**:
+- Stiffer bars reduce roll but can hurt mechanical grip
+- Softer bars improve compliance but increase roll
+- Balance between front/rear affects handling characteristics
+
+#### Two-Pass Velocity Optimization Algorithm
+**File Location**: `lap_simulation/physics.py`
+**Purpose**: Calculates physically realistic velocity profiles using forward and backward constraint propagation
+
+**Detailed Algorithm Explanation**:
+
+The velocity optimization uses a sophisticated **two-pass algorithm** that ensures the vehicle can physically achieve the calculated speeds while maximizing performance. This approach is inspired by racing simulation methodologies and ensures realistic driving physics.
+
+**Phase 1: Forward Pass (Acceleration-Limited)**
+**Function**: `apply_acceleration_limits()`
+**Process**:
+1. **Initialization**: Starts from near-standstill (5 mph) like a real race start
+2. **Point-by-Point Progression**: For each track segment moving forward:
+   - Calculates distance between current and next point
+   - Determines maximum cornering speed from curvature analysis
+   - Applies acceleration physics using kinematic equations
+   
+3. **Acceleration Physics Applied**:
+   - **Base Acceleration**: Uses vehicle's maximum longitudinal acceleration (0.8g for FSAE)
+   - **Drag Calculation**: `F_drag = 0.5 × ρ × Cd × A × v²`
+   - **Net Acceleration**: Subtracts drag force from available acceleration
+   - **Kinematic Constraint**: `v² = v₀² + 2 × a × distance`
+   
+4. **Speed Limiting**: Takes minimum of:
+   - Maximum speed achievable through acceleration from previous point
+   - Maximum cornering speed for current track curvature
+
+**Phase 2: Backward Pass (Deceleration-Limited)**
+**Function**: `apply_deceleration_limits()`
+**Process**:
+1. **Reverse Direction**: Works backward from end of track to beginning
+2. **Deceleration Constraint**: For each point moving backward:
+   - Calculates required deceleration to reach next point's speed
+   - Uses maximum available braking force (1.5g for FSAE)
+   
+3. **Deceleration Physics Applied**:
+   - **Braking Equation**: `v² = v_next² + 2 × max_decel × distance`
+   - **Speed Constraint**: Reduces current speed if vehicle cannot decelerate enough
+   - **Realistic Braking**: Accounts for brake system limits and tire grip
+   
+4. **Speed Updates**: Only reduces speeds (never increases) to ensure feasibility
+
+**Why Two Passes Are Necessary**:
+
+**Forward Pass Limitations**:
+- Can calculate maximum acceleration from any point
+- Cannot "see ahead" to tight corners requiring early braking
+- May set speeds too high for upcoming track sections
+
+**Backward Pass Corrections**:
+- Ensures vehicle can decelerate for upcoming corners
+- Prevents impossible speed transitions
+- Creates smooth, driveable velocity profiles
+
+**Mathematical Example**:
 ```
-Where:
-- `W` = vehicle weight (N)
-- `H` = CG height above roll center (m)
-- `Kphi_f_tot` = total front roll stiffness (Nm/rad)
-- `Kphi_r_tot` = total rear roll stiffness (Nm/rad)
+Track Section: Straight → Tight Corner → Straight
+
+Forward Pass Only:
+Point A: 60 mph (accelerating)
+Point B: 65 mph (still accelerating) 
+Point C: 25 mph (corner limit) ← IMPOSSIBLE! Can't decelerate fast enough
+
+Two-Pass Result:
+Point A: 60 mph
+Point B: 45 mph (backward pass reduced this)
+Point C: 25 mph ← Now physically achievable
+```
+
+**Key Physics Constraints Enforced**:
+
+1. **Lateral Acceleration Limits**:
+   - Maximum cornering g-force based on tire grip
+   - Includes downforce effects for higher speeds
+   - Vehicle-specific grip coefficients from tire model
+
+2. **Longitudinal Acceleration Limits**:
+   - Power-limited acceleration (engine constraints)
+   - Aerodynamic drag at high speeds
+   - Realistic FSAE vehicle performance envelope
+
+3. **Longitudinal Deceleration Limits**:
+   - Brake system maximum force
+   - Tire grip limits during braking
+   - Weight transfer effects on braking performance
+
+**Algorithm Benefits**:
+- **Physically Realistic**: No impossible speed transitions
+- **Performance Optimized**: Maximizes speed within physics constraints
+- **Robust**: Handles any track geometry automatically
+- **Smooth**: Creates driveable velocity profiles
+
+**Real-World Applications**:
+- Racing line optimization for lap time simulation
+- Driver training and setup optimization
+- Vehicle dynamics analysis and validation
+- Competition strategy development
 
 ### Data Loading Functions
 
 #### `load_track_data_quiet()` - Track Data Import
 **File Location**: `main.py` 
 **Purpose**: Loads track coordinates without verbose console output
-**Calls**: `load_comprehensive_track_data()` from visualization package
+
+**Detailed Process**:
+1. **File Format Handling**:
+   - Specifically designed for Excel files (.xlsx format)
+   - Handles both autocross and endurance track layouts
+   - Manages different column naming conventions between files
+
+2. **Data Validation**:
+   - Checks for proper coordinate format (X, Y columns)
+   - Validates data completeness and handles missing points
+   - Ensures coordinate units are consistent (typically feet)
+
+3. **Noise Reduction**:
+   - Suppresses pandas and openpyxl warning messages
+   - Provides clean output for production use
+   - Still reports critical errors that need attention
+
+4. **Integration**:
+   - Calls `load_comprehensive_track_data()` from visualization package
+   - Returns standardized coordinate format for lap simulation
+   - Handles coordinate system transformations if needed
+
+**Usage Context**: Called from `main()` to prepare track data for physics calculations
 
 #### Track Data Processing (in lap_sim.py)
 **File Location**: `lap_simulation/lap_sim.py`
-**Process**:
-1. **Read Excel file** using pandas
-2. **Extract X,Y coordinates** from appropriate columns
-3. **Calculate derivatives** using `np.gradient()`
-4. **Compute curvature** using differential geometry formula
-5. **Generate acceleration arrays** based on track geometry
+**Purpose**: Converts raw track coordinates into physics-ready curvature data
+
+**Step-by-Step Mathematical Process**:
+
+1. **Excel File Reading**:
+   - Loads coordinate data using pandas from various Excel formats
+   - Handles different sheet structures and validates column names
+   - Manages units and coordinate system conventions
+
+2. **Derivative Calculation**:
+   - Calculates first derivatives (dx, dy) representing direction tangent to track
+   - Computes second derivatives (d2x, d2y) representing rate of direction change
+   - Uses numpy gradient with central difference for better accuracy
+
+3. **Curvature Computation**:
+   - Applies differential geometry curvature formula
+   - Higher curvature = tighter turns = more lateral acceleration needed
+   - Units in 1/feet (inverse length)
+
+4. **Acceleration Array Generation**:
+   - Converts curvature to lateral acceleration using centripetal force
+   - Assumes constant velocity (about 30 mph typical autocross speed)
+   - Converts to g-force units, provides baseline for more sophisticated analysis
+
+5. **Longitudinal Acceleration Modeling**:
+   - Identifies corner entry/exit points from curvature data
+   - Applies typical racing driver acceleration patterns
+   - Maintains physically realistic limits (typically ±1.5g)
 
 ### Visualization Functions
 
 #### `load_comprehensive_track_data()` - Comprehensive Data Loading
 **File Location**: `visualization/plot_racing_track.py`
-**Purpose**: Loads track data from multiple sources (Excel, .mat files)
-**Returns**: Track coordinates and racing line data
+**Purpose**: Loads track data from multiple sources and formats
+
+**Detailed Functionality**:
+
+1. **Multi-Format Support**:
+   - **Excel files**: Primary source for track coordinates (.xlsx)
+   - **MATLAB files**: Racing line data from optimization tools (.mat)
+   - **CSV files**: Alternative coordinate format support
+   - **Text files**: Legacy format compatibility
+
+2. **Data Source Integration**:
+   - Handles multiple data sources simultaneously including track coordinates, racing lines, and track boundaries
+
+3. **Coordinate System Management**:
+   - Unit conversion between feet, meters, inches as needed
+   - Origin translation to center tracks at coordinate system origin
+   - Rotation alignment with standard orientations
+   - Scale validation to ensure realistic track dimensions
+
+4. **Data Quality Assurance**:
+   - Gap detection for missing coordinate points
+   - Smoothing with appropriate filtering for noisy data
+   - Validation for physically impossible geometry
+   - Error reporting with detailed feedback on data issues
+
+5. **Return Format**:
+   Returns standardized dictionary with track coordinates, racing line, track boundaries, and metadata
+
+**Integration with Lap Simulation**: Provides clean, validated coordinate data that the physics engine can process reliably.
 
 #### Plotting Functions (in main.py)
 **File Location**: `main.py` lines ~180-300
-**Creates**:
-- **Acceleration plots**: `acceleration_plots.png`
-- **Corner load plots**: `corner_loads.png` (4-panel subplot)
-- **Roll angle plots**: `roll_angles.png`
-- **Track layout plots**: Various track visualization plots
+**Purpose**: Creates comprehensive visualization suite for simulation results
+
+**Detailed Plot Generation**:
+
+1. **Acceleration Plots** (`acceleration_plots.png`):
+   - Two-panel subplot showing longitudinal and lateral accelerations vs distance
+   - Color coding: Blue for longitudinal, Red for lateral
+   - Grid lines for easy value reading with proper axis labels and units
+
+2. **Corner Load Plots** (`corner_loads.png`):
+   - 4-panel subplot for individual wheel loads throughout the lap
+   - Shows load transfer patterns clearly and identifies unloaded wheels
+   - Reveals suspension tuning effects and helps optimize vehicle setup
+
+3. **Roll Angle Plots** (`roll_angles.png`):
+   - Single panel showing body roll throughout lap
+   - Shows suspension stiffness effects and identifies areas needing anti-roll bar tuning
+   - Correlates with handling feedback from drivers
+
+4. **Track Layout Plots**:
+   - **Autocross Layout**: `autocross_track_layout.png`
+   - **Endurance Layout**: `endurance_track_layout.png`
+   - **Velocity Profiles**: Speed-colored track visualizations
+
+**Plot Styling and Professional Presentation**:
+- Consistent color schemes across all plots
+- High-resolution output (300 DPI) for reports
+- Proper axis scaling and grid lines
+- Clear legends and annotations
+- Professional font sizing and spacing
 
 ### Utility Functions
 
 #### `get_plot_path()` and `get_data_path()`
 **File Location**: `lap_simulation/output_utils.py`
 **Purpose**: Generate standardized file paths for outputs
-**Usage**: Ensures all plots and data go to correct `outputs/` subdirectories
+
+**Detailed Path Management**:
+
+1. **`get_plot_path(filename)`**:
+   - Automatically creates `outputs/plots/` directory if it doesn't exist
+   - Uses cross-platform path handling for Windows/Mac/Linux compatibility
+   - Works with relative paths regardless of where Python is executed from
+   - Ensures all plots go to the same standardized location
+
+2. **`get_data_path(filename)`**:
+   - Similar functionality for data files in `outputs/data/` directory
+   - Maintains consistent file organization structure
+
+**Usage Examples**: Used in main.py plotting functions and for CSV data export
+
+**Benefits**: Organization, reproducibility, automation of directory creation, and maintainability
+
+#### `save_simulation_results()` - Data Export Function
+**File Location**: `lap_simulation/output_utils.py`
+**Purpose**: Exports simulation data to CSV files for further analysis
+
+**Detailed Export Process**:
+
+1. **Data Formatting**:
+   - Creates comprehensive data dictionary with properly labeled columns
+   - Distance (ft), accelerations (g), wheel loads (lbf), roll angles (deg)
+
+2. **CSV Export with Metadata**:
+   - Converts to pandas DataFrame for easy export
+   - Adds header comments with simulation parameters including generation time, vehicle mass, track name, and total data points
+
+3. **Data Validation**:
+   - Ensures unit consistency with clear labels
+   - Validates realistic value ranges and verifies completeness
+   - Uses appropriate decimal places for each variable type
+
+**Output Format**: CSV with header metadata followed by columnar data
+
+**Integration with Analysis Tools**: Compatible with MATLAB, Excel, Python analysis, and most engineering software packages
 
 ## Function Dependencies
 
@@ -394,38 +824,6 @@ lap_simulation/lap_sim.py
 | **Roll Angle** | `main.py` | `roll_angle`, `Kphi` | ~240-260 |
 | **Vehicle Parameters** | `vehicle_config.py` | `get_vehicle_config` | N/A |
 
-### Detailed Search Guide
-
-#### 🔍 Track Curvature Calculation
-- **File**: `lap_simulation/lap_sim.py`
-- **Search for**: `np.gradient` or `curvature`
-- **Equation**: Differential geometry curvature formula
-- **Purpose**: Determines how sharp each turn is
-
-#### 🔍 Lateral Acceleration Calculation  
-- **File**: `lap_simulation/lap_sim.py`
-- **Search for**: `lateral_acceleration` or `32.2`
-- **Equation**: Centripetal acceleration (a = v²κ)
-- **Purpose**: Calculates sideways force needed for each turn
-
-#### 🔍 Load Transfer Calculation
-- **File**: `main.py`
-- **Search for**: `lat_transfer` or `long_transfer`
-- **Lines**: Around 150-180
-- **Purpose**: Determines weight distribution between wheels
-
-#### 🔍 Roll Angle Calculation
-- **File**: `main.py` 
-- **Search for**: `roll_angle` or `Kphi`
-- **Lines**: Around 240-260
-- **Purpose**: Calculates how much the car body leans
-
-#### 🔍 Vehicle Parameters
-- **File**: `vehicle_config.py`
-- **Search for**: `get_vehicle_config` function
-- **Contains**: All mass, geometry, and suspension parameters
-- **Purpose**: Stores all physical properties of the vehicle
-
 ---
 
 ## Additional Resources
@@ -440,150 +838,22 @@ lap_simulation/lap_sim.py
 - Check units carefully (especially g-force conversions)
 - Validate physics results against expected ranges
 - Use plotting to visualize intermediate calculations
-- `max_force`: Maximum tire force capability [N]
 
-**Returns:**
-- `available_force`: Available force within friction circle [N]
-- `saturation_factor`: Tire utilization factor [0-1]
+### 💡 Common Issues and Solutions
 
-### Powertrain Physics
+| Issue | Likely Cause | Solution |
+|-------|--------------|----------|
+| Import errors | Missing dependencies | Run `pip install -r requirements.txt` |
+| File not found | Incorrect file paths | Check Excel file location and name |
+| Unrealistic accelerations | Wrong vehicle parameters | Verify mass, CG height, track width |
+| Plot generation fails | Missing output directories | Check `outputs/plots/` folder exists |
 
-#### `engine_torque_curve(rpm, engine_config)`
-**Realistic engine torque and power modeling**
-
-**Engine Physics:**
-- **Torque Curve**: Implements realistic Formula SAE engine characteristics
-- **Power Calculation**: Computes engine power from torque and RPM
-- **Operating Limits**: Enforces realistic RPM range and redline limits
-- **Efficiency Modeling**: Includes engine efficiency variations across operating range
-
-**Parameters:**
-- `rpm`: Engine speed [RPM]
-- `engine_config`: Engine specification dictionary
-
-**Returns:**
-- `torque`: Engine torque [Nm]
-- `power`: Engine power [kW]
-
-#### `transmission_dynamics(engine_torque, gear_ratio, efficiency)`
-**Drivetrain torque and speed conversion**
-
-**Transmission Physics:**
-- **Gear Ratio Effects**: Converts engine torque and speed through transmission ratios
-- **Efficiency Losses**: Models realistic drivetrain efficiency and parasitic losses
-- **Final Drive**: Includes differential and final drive ratio effects
-- **Wheel Torque**: Calculates final torque delivery at wheel contact patch
-
-**Parameters:**
-- `engine_torque`: Input torque from engine [Nm]
-- `gear_ratio`: Combined transmission and final drive ratio
-- `efficiency`: Drivetrain efficiency factor [0-1]
-
-**Returns:**
-- `wheel_torque`: Torque at wheels [Nm]
-- `wheel_speed`: Wheel rotational speed [rad/s]
-
-### Aerodynamics
-
-#### `aerodynamic_forces(velocity, aero_config)`
-**Aerodynamic force and moment calculation**
-
-**Aerodynamic Physics:**
-- **Downforce Generation**: Speed-squared dependency for realistic aerodynamic loading
-- **Drag Calculation**: Parasitic and induced drag with proper scaling
-- **Center of Pressure**: Aerodynamic balance and pitching moment effects
-- **Ground Effect**: Ride height sensitivity for undertray aerodynamics
-
-**Parameters:**
-- `velocity`: Vehicle speed [m/s]
-- `aero_config`: Aerodynamic coefficient dictionary
-
-**Returns:**
-- `downforce`: Total downforce [N]
-- `drag`: Total drag force [N]
-- `front_downforce`: Front axle downforce [N] 
-- `rear_downforce`: Rear axle downforce [N]
-
-**Physical Characteristics:**
-- Realistic coefficient values for formula car
-- Proper speed dependency (v²)
-- Front/rear distribution effects on handling balance
-
-## Vehicle Configuration Physics
-
-### Mass Properties
-- **Total Mass**: Vehicle curb weight including fluids [kg]
-- **Center of Gravity**: Three-dimensional CG location [m]
-- **Moment of Inertia**: Yaw, pitch, roll inertia values [kg⋅m²]
-- **Weight Distribution**: Front/rear and left/right mass distribution [%]
-
-### Geometric Properties  
-- **Wheelbase**: Distance between front and rear axle centerlines [m]
-- **Track Width**: Distance between left and right wheel centerlines [m]
-- **Roll Centers**: Front and rear suspension roll center heights [m]
-- **CG Height**: Center of gravity height above ground [m]
-
-### Suspension Properties
-- **Spring Rates**: Front and rear spring rates [N/m]
-- **Roll Stiffness**: Front and rear roll stiffness [Nm/rad]
-- **Damping**: Front and rear damping coefficients [Ns/m]
-- **Anti-Roll Bars**: Roll bar stiffness contributions [Nm/rad]
-
-### Tire Properties
-- **Size**: Tire dimensions and specifications
-- **Pressure**: Operating tire pressure [psi]
-- **Compound**: Tire compound and temperature characteristics
-- **Magic Formula Coefficients**: B, C, D, E parameters for force calculations
-
-### Aerodynamic Properties
-- **Downforce Coefficients**: Front and rear downforce coefficients
-- **Drag Coefficient**: Overall vehicle drag coefficient
-- **Reference Areas**: Frontal area and aerodynamic reference areas [m²]
-- **Center of Pressure**: Aerodynamic center location [m]
-
-## Physics Validation and Accuracy
-
-### Validation Methods
-- **Benchmark Comparison**: Results compared against professional vehicle dynamics software
-- **Real-World Data**: Validation against actual vehicle testing data
-- **Published Literature**: Algorithms verified against academic and industry publications
-- **Sensitivity Analysis**: Parameter variations tested for realistic behavior
-
-### Accuracy Standards
-- **Force Balance**: All forces and moments properly balanced in simulation
-- **Energy Conservation**: Kinetic and potential energy properly tracked
-- **Physical Limits**: All calculations respect physical constraints and limits
-- **Unit Consistency**: Proper unit conversions and dimensional analysis throughout
-
-### Performance Characteristics
-- **Simulation Speed**: Typically 2-5 seconds for complete lap analysis
-- **Resolution**: Support for 1000+ data points along track
-- **Stability**: Robust numerical integration with automatic step size control
-- **Precision**: Maintains accuracy throughout wide range of operating conditions
-
-This API provides the foundation for accurate vehicle dynamics simulation suitable for engineering analysis, vehicle development, and motorsports applications.
-    'C': 1.4,    # Shape factor
-    'D': 1.0,    # Peak factor
-    'E': -0.5    # Curvature factor
-}
-```
-
-## Error Handling
-
-All functions include comprehensive error handling:
-
-```python
-try:
-    results = simulator.simulate_lap('endurance')
-except FileNotFoundError:
-    print("Track data file not found")
-except ValueError as e:
-    print(f"Invalid parameter: {e}")
-```
-
-## Performance Notes
-
+### 🎯 Performance Optimization
 - Use vectorized NumPy operations for large datasets
 - Cache loaded data to avoid repeated file I/O
 - Consider using multiprocessing for parameter sweeps
 - Profile code with `cProfile` for optimization
+
+---
+
+*This API reference provides the complete foundation for understanding and working with the lap simulation codebase. For additional help, consult the User Guide or examine the code comments directly.*
