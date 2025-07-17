@@ -419,3 +419,91 @@ def estimate_lap_time(distances, velocities):
             lap_time += time_segment
     
     return lap_time
+
+
+def calculate_load_transfer(A_lat_g, A_long_g, vehicle_config):
+    """
+    Calculate individual wheel loads accounting for lateral and longitudinal load transfer.
+    
+    Parameters:
+    -----------
+    A_lat_g : np.ndarray
+        Lateral acceleration in g-force
+    A_long_g : np.ndarray
+        Longitudinal acceleration in g-force
+    vehicle_config : dict
+        Vehicle configuration parameters
+        
+    Returns:
+    --------
+    dict
+        Dictionary with arrays for each wheel load: 'FL', 'FR', 'RL', 'RR' in lbs
+    """
+    N = len(A_lat_g)
+    
+    # Initialize load arrays
+    loads = {
+        'FL': np.zeros(N),  # Front Left
+        'FR': np.zeros(N),  # Front Right
+        'RL': np.zeros(N),  # Rear Left
+        'RR': np.zeros(N)   # Rear Right
+    }
+    
+    # Get vehicle parameters
+    base_load = vehicle_config['weight'] / 4.0 * 0.224809  # N to lbs conversion, divided by 4 corners
+    
+    for i in range(N):
+        # Simplified load transfer calculation using vehicle config
+        lat_transfer = A_lat_g[i] * vehicle_config['mass'] * 0.224809 * 0.3  # Lateral load transfer
+        long_transfer = A_long_g[i] * vehicle_config['mass'] * 0.224809 * 0.2  # Longitudinal load transfer
+        
+        # Calculate individual corner loads
+        loads['FL'][i] = base_load - lat_transfer + long_transfer
+        loads['FR'][i] = base_load + lat_transfer + long_transfer
+        loads['RL'][i] = base_load - lat_transfer - long_transfer
+        loads['RR'][i] = base_load + lat_transfer - long_transfer
+    
+    return loads
+
+
+def calculate_roll_angle(A_lat_g, vehicle_config):
+    """
+    Calculate vehicle body roll angle during cornering.
+    
+    Parameters:
+    -----------
+    A_lat_g : np.ndarray
+        Lateral acceleration in g-force
+    vehicle_config : dict
+        Vehicle configuration parameters
+        
+    Returns:
+    --------
+    np.ndarray
+        Roll angle in degrees
+    """
+    # Vehicle parameters from config (convert to imperial units for consistency with MATLAB)
+    W = vehicle_config['weight'] * 0.224809  # N to lbs
+    CG_z = vehicle_config['cg_height'] * 39.3701  # m to inches
+    RC_f = vehicle_config['roll_center_front'] * 39.3701  # m to inches
+    RC_r = vehicle_config['roll_center_rear'] * 39.3701  # m to inches
+    wb = vehicle_config['wheelbase'] * 39.3701  # m to inches
+    CG_x = vehicle_config['cg_x'] * 39.3701  # m to inches
+    a = CG_x  # Distance from front axle to CG [in]
+    b = wb - a  # Distance from rear axle to CG [in]
+    
+    H = (CG_z - ((RC_r-RC_f)/wb)*b - RC_r)/12
+    
+    # Axle Roll Stiffness from vehicle config (convert from metric if needed)
+    Kphi_f_tot = vehicle_config['roll_stiffness_front']  # ft-lb/rad
+    Kphi_r_tot = vehicle_config['roll_stiffness_rear']   # ft-lb/rad
+    
+    # Convert to imperial units if needed
+    if Kphi_f_tot < 1000:  # Likely in metric units (N-m/rad)
+        Kphi_f_tot *= 0.737562  # Convert N-m/rad to ft-lb/rad
+        Kphi_r_tot *= 0.737562
+    
+    # Calculate roll angle (matches MATLAB formula exactly)
+    roll_angle = ((A_lat_g * W * H) / (Kphi_f_tot + Kphi_r_tot)) * (180/np.pi)
+    
+    return roll_angle

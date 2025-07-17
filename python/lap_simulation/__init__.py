@@ -8,13 +8,14 @@ compatibility with the original data files (.mat format).
 Modules:
 --------
 - lap_sim: Main lap simulation function
-- physics: Physics-based velocity calculation following MATLAB methodology
+- physics: Physics calculations (load transfer, roll angles, velocity optimization)
+- plotting: Visualization and plotting functions
+- data_export: Data export and results management
 - data_loader: Load track coordinates and MATLAB data files
 - output_utils: Centralized output file management
 - tire_model: Magic Formula tire model implementation  
 - powertrain: Engine and transmission modeling
 - vehicle_dynamics: Vehicle dynamics calculations
-- data_loader: Utilities for loading MATLAB data files
 """
 
 from .lap_sim import lap_sim

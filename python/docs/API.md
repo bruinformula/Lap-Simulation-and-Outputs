@@ -116,10 +116,29 @@ This section provides the exact file locations for all functions used in the sim
 
 | Function | File Location | Line Range | Purpose |
 |----------|---------------|------------|---------|
-| `calculate_load_transfer()` | `main.py` | ~150-180 | Calculates how weight shifts between wheels during cornering and braking |
+| `calculate_load_transfer()` | `lap_simulation/physics.py` | ~425+ | Calculates how weight shifts between wheels during cornering and braking |
+| `calculate_roll_angle()` | `lap_simulation/physics.py` | ~460+ | Computes vehicle body roll angle from lateral acceleration and suspension properties |
 | `calculate_curvature()` | `lap_simulation/lap_sim.py` | ~30-40 | Computes track curvature from coordinate data using differential geometry |
 | `magic_formula_lateral()` | `lap_simulation/tire_model.py` | ~20+ | Calculates lateral tire force using the Pacejka Magic Formula |
-| `calculate_roll_angle()` | `main.py` | ~240-260 | Computes vehicle body roll angle from lateral acceleration and suspension properties |
+
+### Plotting and Visualization Functions
+
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `plot_accelerations()` | `lap_simulation/plotting.py` | Creates acceleration vs distance plots |
+| `plot_corner_loads()` | `lap_simulation/plotting.py` | Generates individual wheel load plots |
+| `plot_accelerations_by_sample()` | `lap_simulation/plotting.py` | Creates acceleration vs sample number plots |
+| `plot_roll_angles()` | `lap_simulation/plotting.py` | Generates roll angle vs distance plots |
+| `plot_track_only()` | `lap_simulation/plotting.py` | Creates track layout visualization with velocity-colored racing line |
+| `plot_velocity_profile()` | `lap_simulation/plotting.py` | Generates velocity profile along track distance |
+
+### Data Export Functions
+
+| Function | File Location | Purpose |
+|----------|---------------|---------|
+| `save_simulation_results()` | `lap_simulation/data_export.py` | Exports simulation data to CSV files |
+| `create_summary_report()` | `lap_simulation/data_export.py` | Creates statistical summary of simulation results |
+| `print_summary_report()` | `lap_simulation/data_export.py` | Prints formatted summary report to console |
 
 ### Vehicle Configuration Functions
 
@@ -160,8 +179,8 @@ When you execute `python main.py`, here's exactly what happens step by step:
 
 #### **Phase 1: Initialization (Lines ~25-50)**
 1. **Import Dependencies**: 
-   - Loads numpy, pandas, matplotlib for calculations and plotting
-   - Imports custom modules: `vehicle_config`, `lap_sim`, `output_utils`, `plot_racing_track`
+   - Loads numpy, pandas for calculations and data handling
+   - Imports custom modules: `vehicle_config`, `lap_sim`, `physics`, `plotting`, `data_export`
 
 2. **Load Vehicle Configuration**:
    - Calls `get_vehicle_config()` from `vehicle_config.py`
@@ -187,75 +206,77 @@ When you execute `python main.py`, here's exactly what happens step by step:
      - Creates distance array for the entire track
    - **Returns**: Three arrays - `A_long_g[]`, `A_lat_g[]`, `distance[]`
 
-#### **Phase 3: Load Transfer Analysis (Lines ~80-180)**
-6. **Calculate Individual Wheel Loads**:
-   - For each point around the track (loop through all array indices):
+#### **Phase 3: Physics Analysis (Lines ~80-120)**
+6. **Calculate Load Transfer**:
+   - Calls `calculate_load_transfer(A_lat_g, A_long_g, vehicle_config)` from `physics.py`
+   - For each point around the track:
      - **Base Load**: Each wheel starts with 1/4 of total vehicle weight
      - **Lateral Transfer**: `lat_transfer = A_lat_g[i] × mass × 0.224809 × cg_height_factor`
      - **Longitudinal Transfer**: `long_transfer = A_long_g[i] × mass × 0.224809 × cg_height_factor`
-     - **Individual Wheels**:
-       - Front Left: `base_load - lat_transfer + long_transfer`
-       - Front Right: `base_load + lat_transfer + long_transfer`
-       - Rear Left: `base_load - lat_transfer - long_transfer`
-       - Rear Right: `base_load + lat_transfer - long_transfer`
+     - **Individual Wheels**: Combines static load with dynamic transfers
+   - **Returns**: Dictionary with arrays for FL, FR, RL, RR wheel loads
 
-#### **Phase 4: Roll Angle Calculations (Lines ~240-260)**
-7. **Calculate Vehicle Body Roll**:
+7. **Calculate Roll Angles**:
+   - Calls `calculate_roll_angle(A_lat_g, vehicle_config)` from `physics.py`
    - For each track point: `roll_angle = (A_lat_g × W × H) / (Kphi_front + Kphi_rear)`
    - Uses lateral acceleration, vehicle weight, CG height, and total roll stiffness
-   - Converts from radians to degrees for practical interpretation
+   - **Returns**: Array of roll angles in degrees
 
-#### **Phase 5: Data Visualization (Lines ~180-300)**
-8. **Generate Acceleration Plots**:
-   - Creates 2-panel subplot: longitudinal vs lateral acceleration
-   - Plots both arrays against distance traveled
-   - Saves as `acceleration_plots.png` using `get_plot_path()`
+#### **Phase 4: Visualization (Lines ~120-150)**
+8. **Generate All Plots**:
+   - Calls plotting functions from `plotting.py`:
+     - `plot_accelerations(distance, A_long_g, A_lat_g)` - Acceleration vs distance
+     - `plot_corner_loads(loads)` - Individual wheel loads
+     - `plot_accelerations_by_sample(A_long_g, A_lat_g)` - Acceleration vs sample number
+     - `plot_roll_angles(distance, roll_angle)` - Roll angle vs distance
+   - Each function saves plots as PNG files in the outputs directory
 
-9. **Generate Load Transfer Plots**:
-   - Creates 4-panel subplot showing individual wheel loads
-   - Each panel shows one wheel's load variation throughout the lap
-   - Saves as `corner_loads.png`
+#### **Phase 5: Data Export and Reporting (Lines ~150-180)**
+9. **Export Simulation Data**:
+   - Calls `save_simulation_results()` from `data_export.py`
+   - Creates CSV file with all calculated data including metadata header
 
-10. **Generate Roll Angle Plots**:
-    - Single plot showing body roll angle vs distance
-    - Saves as `roll_angles.png`
+10. **Generate Summary Report**:
+    - Calls `create_summary_report()` and `print_summary_report()` from `data_export.py`
+    - Displays key simulation statistics (max accelerations, total distance, etc.)
 
-11. **Generate Track Layout Plots**:
-    - Calls plotting functions from `visualization/plot_racing_track.py`
-    - Creates track layout visualizations with velocity profiles
-
-#### **Phase 6: Data Export (Lines ~300+)**
-12. **Export Simulation Data**:
-    - Calls `save_simulation_results()` from `output_utils.py`
-    - Creates CSV file with all calculated data
-    - Includes metadata header with simulation parameters
+#### **Phase 6: Track Visualizations**
+11. **Create Track Layout Plots**:
+    - Calls `create_track_visualizations()` which uses functions from `plotting.py`
+    - Creates track layout visualizations with velocity profiles for both endurance and autocross
 
 #### **Phase 7: Completion**
-13. **Print Summary**:
-    - Displays completion message with output file locations
-    - Shows key simulation statistics (max accelerations, total distance, etc.)
+12. **Return Results**:
+    - Main function returns all simulation results for further analysis if needed
 
 ### **Data Flow Summary**:
 ```
-Excel Track File → lap_sim() → [Accelerations] → Load Transfer Calc → Individual Wheel Loads
+Excel Track File → lap_sim() → [A_long_g, A_lat_g, distance] → Physics Module → [Loads, Roll Angles]
                                      ↓
-                               Roll Angle Calc → Body Roll Values
+                              Plotting Module → PNG Files
                                      ↓
-                            Plotting Functions → PNG Files + CSV Export
+                             Data Export Module → CSV Files + Summary Report
 ```
 
 ### **Key Variables Throughout Execution**:
 - **`vehicle_config`**: Dictionary with all vehicle parameters (persistent throughout)
 - **`A_long_g[]`, `A_lat_g[]`, `distance[]`**: Core simulation results from lap_sim()
-- **`loads_FL[]`, `loads_FR[]`, `loads_RL[]`, `loads_RR[]`**: Individual wheel loads
-- **`roll_angle[]`**: Vehicle body roll angles
-- **File paths**: Generated by `get_plot_path()` and `get_data_path()` for consistent output
+- **`loads`**: Dictionary with individual wheel loads from physics module
+- **`roll_angle[]`**: Vehicle body roll angles from physics module
+- **File paths**: Generated by plotting and data export modules for consistent output
 
 ### **Error Handling**:
 - Excel file loading failures trigger fallback data generation
 - Physics calculations include range validation
 - Plot generation includes directory creation and format verification
-- All file operations include error reporting
+- All file operations include error reporting with detailed module-specific feedback
+
+### **New Modular Structure Benefits**:
+- **Separation of Concerns**: Physics, plotting, and data export are clearly separated
+- **Maintainability**: Each module can be updated independently
+- **Testability**: Individual modules can be tested in isolation
+- **Reusability**: Physics functions can be used by other scripts without importing plotting code
+- **Clean Main Function**: `main.py` now orchestrates workflow without implementing physics
 
 ### Main Simulation Workflow
 
@@ -560,6 +581,52 @@ The velocity optimization uses a sophisticated **two-pass algorithm** that ensur
    - **Realistic Braking**: Accounts for brake system limits and tire grip
    
 4. **Speed Updates**: Only reduces speeds (never increases) to ensure feasibility
+
+#### Load Transfer Calculations
+**Function**: `calculate_load_transfer()`
+**File Location**: `lap_simulation/physics.py` 
+**Purpose**: Calculates how vehicle weight redistributes between wheels during dynamic maneuvers
+
+**Detailed Physics Process**:
+
+1. **Static Load Distribution**:
+   - Each wheel carries 1/4 of total weight when stationary
+   - Assumes even weight distribution (realistic for Formula SAE)
+   - Conversion factor 0.224809 converts Newtons to pounds-force
+
+2. **Lateral Load Transfer (Cornering)**:
+   - Weight shifts from inside to outside wheels during turns
+   - Centripetal force creates a moment about the vehicle roll center
+   - Higher center of gravity = larger moment arm = more weight transfer
+   - Outside wheels gain load, inside wheels lose load
+   - Critical for understanding tire grip limits and handling balance
+
+3. **Longitudinal Load Transfer (Acceleration/Braking)**:
+   - Weight shifts from rear to front during braking, front to rear during acceleration
+   - Inertial forces create moments about the vehicle pitch center
+   - Front wheels gain load under braking (weight "shifts forward")
+   - Rear wheels gain load under acceleration (weight "shifts backward")
+   - Affects braking performance and traction-limited acceleration
+
+#### Roll Angle Calculations
+**Function**: `calculate_roll_angle()`
+**File Location**: `lap_simulation/physics.py`
+**Purpose**: Calculates vehicle body roll angle during cornering maneuvers
+
+**Detailed Physics Implementation**:
+
+1. **Roll Moment Calculation**:
+   - Lateral acceleration creates inertial force at center of gravity
+   - Distance from CG to roll center creates moment arm
+   - This moment tries to roll the vehicle body
+
+2. **Total Roll Stiffness**:
+   - Combined front and rear anti-roll bar stiffness
+   - Components include anti-roll bars, spring rates, suspension compliance, tire sidewall stiffness
+
+3. **Roll Angle Calculation**:
+   - Roll angle calculated from moment equilibrium
+   - Converts from radians to degrees for practical interpretation
 
 **Why Two Passes Are Necessary**:
 
