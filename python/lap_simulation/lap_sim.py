@@ -119,15 +119,11 @@ def lap_sim(lap_coords, base_dir):
     
     # Section 9-10: Track Processing (simplified for now)
     
-    # Calculate distances between points
-    distances = np.zeros(len(X_racing))
-    for i in range(1, len(X_racing)):
-        dx = X_racing[i] - X_racing[i-1]
-        dy = Y_racing[i] - Y_racing[i-1]
-        distances[i] = np.sqrt(dx**2 + dy**2)
+    # Import physics functions (avoid circular imports)
+    from .physics import calculate_distance_array
     
-    # Cumulative distance
-    distance = np.cumsum(distances)
+    # Calculate cumulative distance using physics module
+    distance = calculate_distance_array(X_racing, Y_racing)
     
     # Section 11: Lap Information - matches MATLAB exactly
     # Get vehicle configuration for simulation
@@ -141,7 +137,7 @@ def lap_sim(lap_coords, base_dir):
 
 def lap_information(X_racing, Y_racing, distance, vehicle_config=None):
     """
-    Python equivalent of lap_information.m function
+    Python equivalent of lap_information.m function - now delegating physics to physics module.
     
     Parameters:
     -----------
@@ -162,137 +158,16 @@ def lap_information(X_racing, Y_racing, distance, vehicle_config=None):
     if vehicle_config is None:
         vehicle_config = get_vehicle_config()
     
-    n_points = len(X_racing)
-    
-    # Initialize arrays
-    acceleration = np.zeros(n_points)
-    lateral_accel = np.zeros(n_points)
-    velocity = np.zeros(n_points)
-    curvature = np.zeros(n_points)
-    
-    # Calculate curvature at each point (with sign for turn direction)
-    for i in range(1, n_points-1):
-        # Three-point curvature calculation with sign
-        x1, y1 = X_racing[i-1], Y_racing[i-1]
-        x2, y2 = X_racing[i], Y_racing[i]
-        x3, y3 = X_racing[i+1], Y_racing[i+1]
-        
-        # Calculate signed curvature using cross product
-        dx1, dy1 = x2 - x1, y2 - y1
-        dx2, dy2 = x3 - x2, y3 - y2
-        
-        # Cross product gives sign: positive = right turn, negative = left turn
-        cross_product = dx1 * dy2 - dy1 * dx2
-        
-        # Magnitude calculation
-        ds1 = np.sqrt(dx1**2 + dy1**2)
-        ds2 = np.sqrt(dx2**2 + dy2**2)
-        
-        if ds1 > 1e-10 and ds2 > 1e-10:
-            # Signed curvature
-            curvature[i] = cross_product / (ds1 * ds2 * (ds1 + ds2))
-        else:
-            curvature[i] = 0
-    
-    # Vehicle parameters from configuration
-    mu = vehicle_config['tire_params']['mu']  # Tire coefficient of friction
-    g = vehicle_config['gravity']  # m/s^2
-    mass_kg = vehicle_config['mass']  # kg
-    
-    # Maximum lateral acceleration based on tire grip
-    max_lat_accel = mu * g  # m/s^2
-    
-    # Calculate maximum velocity for each corner based on lateral acceleration limit
-    for i in range(n_points):
-        if abs(curvature[i]) > 1e-6:  # Use absolute value for speed calculation
-            # v = sqrt(a_lat / |curvature|) - speed depends on magnitude only
-            max_velocity = np.sqrt(max_lat_accel / abs(curvature[i]))
-            velocity[i] = min(max_velocity, vehicle_config['max_velocity'])  # Use config max velocity
-        else:
-            velocity[i] = vehicle_config['max_velocity']  # Use config max velocity
-    
-    # Smooth velocity profile (but preserve acceleration opportunities)
-    window = 3  # Reduced window to preserve more detail
-    velocity_smooth = velocity.copy()
-    for i in range(window, n_points-window):
-        velocity_smooth[i] = np.mean(velocity[i-window:i+window+1])
-    
-    # Apply realistic acceleration and braking constraints with powertrain limits
-    max_accel_base = 1.2 * g  # 1.2g traction-limited acceleration
-    max_brake = -1.8 * g  # 1.8g braking limit
-    
     # Get powertrain configuration for power limits
     powertrain_config = get_powertrain_config()
-    # Convert hp to watts: 1 hp = 745.7 watts
-    max_power_watts = 60 * 745.7  # Approximate power in watts
     
-    # Forward pass: limit acceleration (including power limitations)
-    for i in range(1, n_points):
-        ds = distance[i] - distance[i-1] if distance[i] > distance[i-1] else 1.0
-        if ds > 0:
-            # Power-limited acceleration at higher speeds
-            current_speed = velocity_smooth[i-1]
-            if current_speed > 7.5:  # Above ~7.5 m/s, power becomes limiting
-                power_limited_accel = max_power_watts / current_speed / mass_kg  # Force = Power/Speed, a = F/m
-                max_accel = min(max_accel_base, power_limited_accel)
-            else:
-                max_accel = max_accel_base
-                
-            # Calculate max velocity based on acceleration limit
-            v_max_accel = np.sqrt(velocity_smooth[i-1]**2 + 2 * max_accel * ds)
-            velocity_smooth[i] = min(velocity_smooth[i], v_max_accel)
+    # Import physics functions (avoid circular imports)
+    from .physics import calculate_comprehensive_lap_physics
     
-    # Backward pass: limit braking
-    for i in range(n_points-2, -1, -1):
-        ds = distance[i+1] - distance[i] if distance[i+1] > distance[i] else 1.0
-        if ds > 0:
-            # Calculate max velocity based on braking limit
-            v_max_brake = np.sqrt(velocity_smooth[i+1]**2 - 2 * max_brake * ds)
-            velocity_smooth[i] = min(velocity_smooth[i], v_max_brake)
-    
-    velocity = velocity_smooth
-    
-    # Calculate longitudinal acceleration using distance-based method
-    for i in range(1, n_points-1):
-        # Use actual distance and velocity for acceleration calculation
-        ds_back = distance[i] - distance[i-1]
-        ds_forward = distance[i+1] - distance[i]
-        
-        if ds_back > 0 and ds_forward > 0 and velocity[i] > 0:
-            # Time between points based on velocity
-            dt_back = ds_back / velocity[i]
-            dt_forward = ds_forward / velocity[i]
-            dt_total = dt_back + dt_forward
-            
-            if dt_total > 1e-6:
-                # Central difference using actual time steps
-                acceleration[i] = (velocity[i+1] - velocity[i-1]) / dt_total / g  # Convert to g's
-                
-                # Alternative: use kinematic equation a = v*dv/ds
-                dv = velocity[i+1] - velocity[i-1]
-                ds_avg = (ds_back + ds_forward) / 2
-                if ds_avg > 0:
-                    accel_kinematic = velocity[i] * dv / ds_avg / g
-                    # Use the more conservative (smaller magnitude) value
-                    if abs(accel_kinematic) < abs(acceleration[i]):
-                        acceleration[i] = accel_kinematic
-    
-    # Calculate lateral acceleration (with proper sign)
-    for i in range(n_points):
-        if velocity[i] > 0:
-            # Signed lateral acceleration: positive = right turn, negative = left turn
-            lateral_accel[i] = (velocity[i]**2 * curvature[i]) / g  # Convert to g's
-        else:
-            lateral_accel[i] = 0
-    
-    # Apply realistic limits (preserve sign)
-    acceleration = np.clip(acceleration, -1.8, 1.2)  # Typical FSAE limits
-    lateral_accel = np.clip(lateral_accel, -1.8, 1.8)  # Allow negative lateral acceleration
-    
-    # Add some realistic noise and variation
-    acceleration += np.random.normal(0, 0.05, n_points)
-    lateral_accel += np.random.normal(0, 0.02, n_points)
-    # Remove the abs() call that was forcing positive values
+    # Delegate all physics calculations to the physics module
+    acceleration, lateral_accel, distance = calculate_comprehensive_lap_physics(
+        X_racing, Y_racing, distance, vehicle_config, powertrain_config
+    )
     
     return acceleration, lateral_accel, distance
 
