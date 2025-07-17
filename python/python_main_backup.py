@@ -288,3 +288,232 @@ if __name__ == "__main__":
     print(f"\n✅ Python lap simulation complete!")
     print(f"📊 All plots have been saved to the outputs/plots/ directory")
     print(f"💾 Simulation data saved to outputs/data/ directory")
+    
+    # Load comprehensive track data with physics-based velocity calculation
+    print("Loading comprehensive track data with physics-based velocities...")
+    try:
+        track_data = load_comprehensive_track_data(base_dir)
+        
+        if track_data:
+            print(f"Loaded track data for: {list(track_data.keys())}")
+            
+            # Plot individual tracks with velocity data
+            if 'endurance' in track_data:
+                print("Plotting Endurance track with physics-based velocities...")
+                plot_comprehensive_track(track_data['endurance'], 'endurance',
+                                        'comprehensive_endurance_track.png')
+                
+                # Display velocity statistics
+                velocities = track_data['endurance']['racing_line']['velocity']
+                distances = track_data['endurance']['racing_line']['distance']
+                lap_time = estimate_lap_time(distances, velocities)
+                print(f"  Endurance Track Performance:")
+                print(f"    Track length: {distances[-1]:.0f} ft")
+                print(f"    Average speed: {np.mean(velocities):.1f} mph")
+                print(f"    Max speed: {np.max(velocities):.1f} mph")
+                print(f"    Estimated lap time: {lap_time:.1f} seconds")
+            
+            if 'autocross' in track_data:
+                print("Plotting Autocross track with physics-based velocities...")
+                plot_comprehensive_track(track_data['autocross'], 'autocross',
+                                        'comprehensive_autocross_track.png')
+                
+                # Display velocity statistics
+                velocities = track_data['autocross']['racing_line']['velocity']
+                distances = track_data['autocross']['racing_line']['distance']
+                lap_time = estimate_lap_time(distances, velocities)
+                print(f"  Autocross Track Performance:")
+                print(f"    Track length: {distances[-1]:.0f} ft")
+                print(f"    Average speed: {np.mean(velocities):.1f} mph")
+                print(f"    Max speed: {np.max(velocities):.1f} mph")
+                print(f"    Estimated lap time: {lap_time:.1f} seconds")
+            
+            # Plot track comparison if both tracks available
+            if len(track_data) >= 2:
+                print("Creating comprehensive track comparison...")
+                plot_track_comparison(track_data, 'comprehensive_track_comparison.png')
+        else:
+            print("⚠ No track data could be loaded")
+            
+    except Exception as e:
+        print(f"Error loading comprehensive track data: {e}")
+        print("Falling back to basic track plotting...")
+        plot_optimized_racing_track()  # Fallback to original function
+
+
+def plot_ggv_diagram():
+    """Create a g-g-V diagram visualization."""
+    print("Generating g-g-V diagram...")
+    
+    # Create sample data for visualization
+    velocities = np.linspace(15, 100, 20)  # ft/s
+    max_accel = 1.2 * np.exp(-velocities/80) + 0.3  # Decreasing with speed
+    max_lateral = 1.5 * np.ones_like(velocities)  # Constant lateral
+    
+    # Create g-g diagram
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Velocity vs acceleration plot
+    ax1.plot(velocities, max_accel, 'b-', linewidth=2, label='Max Acceleration')
+    ax1.plot(velocities, -0.8 * np.ones_like(velocities), 'r-', linewidth=2, label='Max Braking')
+    ax1.set_xlabel('Velocity [ft/s]')
+    ax1.set_ylabel('Longitudinal Acceleration [g]')
+    ax1.set_title('Acceleration vs Velocity')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # g-g plot
+    g_lat = np.linspace(-1.5, 1.5, 100)
+    g_long_pos = np.sqrt(np.maximum(0, 1.8**2 - g_lat**2)) * 0.8  # Ellipse for acceleration
+    g_long_neg = -np.sqrt(np.maximum(0, 1.8**2 - g_lat**2)) * 1.0  # Ellipse for braking
+    
+    ax2.plot(g_lat, g_long_pos, 'b-', linewidth=2, label='Acceleration Limit')
+    ax2.plot(g_lat, g_long_neg, 'r-', linewidth=2, label='Braking Limit')
+    ax2.fill_between(g_lat, g_long_neg, g_long_pos, alpha=0.2, color='gray')
+    ax2.set_xlabel('Lateral Acceleration [g]')
+    ax2.set_ylabel('Longitudinal Acceleration [g]')
+    ax2.set_title('g-g Diagram')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    ax2.axis('equal')
+    
+    plt.tight_layout()
+    plot_path = get_plot_path('ggv_diagram.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
+    plt.show()
+
+
+def plot_optimized_racing_track():
+    """Plot the optimized racing track from the Scaled sheet."""
+    print("Plotting optimized racing track...")
+    
+    try:
+        # Load track data from the Scaled sheet directly
+        # Use the parent directory where Excel files are located
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        endurance_coords = "Endurance_Coordinates_1.xlsx"
+        filepath = os.path.join(base_dir, endurance_coords)
+        
+        # Load Excel data directly - skip header rows
+        raw_data = pd.read_excel(filepath, sheet_name='Scaled', header=None, skiprows=3)
+        
+        # Filter out rows where any column contains non-numeric data
+        numeric_data = []
+        for _, row in raw_data.iterrows():
+            try:
+                # Try to convert all values to float
+                numeric_row = [float(x) for x in row.values if pd.notna(x)]
+                if len(numeric_row) == 5:  # Should have 5 columns
+                    numeric_data.append(numeric_row)
+            except (ValueError, TypeError):
+                continue  # Skip non-numeric rows
+        
+        if not numeric_data:
+            raise ValueError("No valid numeric track data found")
+        
+        track_data = np.array(numeric_data)
+        
+        # Extract coordinates (matches MATLAB structure)
+        gate_nums = track_data[:, 0]
+        outside_x = track_data[:, 1]
+        outside_y = track_data[:, 2]
+        inside_x = track_data[:, 3] 
+        inside_y = track_data[:, 4]
+        
+        # Calculate racing line (center of track) - low resolution for boundaries
+        racing_x_lowres = (outside_x + inside_x) / 2
+        racing_y_lowres = (outside_y + inside_y) / 2
+        
+        # Load high-resolution racing line from MATLAB data
+        try:
+            from scipy.io import loadmat
+            racing_line_path = os.path.join(base_dir, 'Data Files', 'endurance_racing_line.mat')
+            racing_line_data = loadmat(racing_line_path)
+            
+            if 'vehicle_path' in racing_line_data:
+                vehicle_path = racing_line_data['vehicle_path']
+                if vehicle_path.shape[0] == 2:  # [x_coords; y_coords] format
+                    racing_x = vehicle_path[0, :].flatten()
+                    racing_y = vehicle_path[1, :].flatten()
+                    print(f"Using high-resolution racing line with {len(racing_x)} points")
+                else:
+                    racing_x = racing_x_lowres
+                    racing_y = racing_y_lowres
+            else:
+                racing_x = racing_x_lowres
+                racing_y = racing_y_lowres
+        except Exception as e:
+            print(f"Could not load high-res racing line: {e}")
+            racing_x = racing_x_lowres
+            racing_y = racing_y_lowres
+        
+        # Create the plot
+        plt.figure(figsize=(14, 10))
+        
+        # Plot track boundaries
+        plt.plot(outside_x, outside_y, 'k-', linewidth=2, label='Outside Boundary')
+        plt.plot(inside_x, inside_y, 'k-', linewidth=2, label='Inside Boundary')
+        
+        # Plot racing line
+        plt.plot(racing_x, racing_y, 'r-', linewidth=3, label='Racing Line')
+        
+        # Add start/finish line
+        start_x = [outside_x[0], inside_x[0]]
+        start_y = [outside_y[0], inside_y[0]]
+        plt.plot(start_x, start_y, 'g-', linewidth=4, label='Start/Finish')
+        
+        plt.title('Optimized Racing Track - Endurance Course', fontsize=16, fontweight='bold')
+        plt.xlabel('X Position (ft)', fontsize=12)
+        plt.ylabel('Y Position (ft)', fontsize=12)
+        plt.legend(fontsize=11)
+        plt.axis('equal')
+        plt.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plot_path = get_plot_path('racing_track.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        print_save_message(plot_path, 'plot')
+        plt.show()
+        
+        print(f"Track plotted successfully with {len(racing_x)} points")
+        
+    except Exception as e:
+        print(f"Error plotting track: {e}")
+        # Create a simple oval track for demonstration
+        theta = np.linspace(0, 2*np.pi, 100)
+        outside_x = 400 * np.cos(theta) + 100 * np.cos(3*theta)
+        outside_y = 200 * np.sin(theta) + 50 * np.sin(3*theta)
+        inside_x = 300 * np.cos(theta) + 80 * np.cos(3*theta)
+        inside_y = 150 * np.sin(theta) + 40 * np.sin(3*theta)
+        racing_x = (outside_x + inside_x) / 2
+        racing_y = (outside_y + inside_y) / 2
+        
+        plt.figure(figsize=(14, 10))
+        plt.plot(outside_x, outside_y, 'k-', linewidth=2, label='Outside Boundary')
+        plt.plot(inside_x, inside_y, 'k-', linewidth=2, label='Inside Boundary')
+        plt.plot(racing_x, racing_y, 'r-', linewidth=3, label='Racing Line')
+        plt.title('Demo Racing Track', fontsize=16, fontweight='bold')
+        plt.xlabel('X Position (ft)', fontsize=12)
+        plt.ylabel('Y Position (ft)', fontsize=12)
+        plt.legend()
+        plt.axis('equal')
+        plt.grid(True, alpha=0.3)
+        plt.show()
+
+
+if __name__ == "__main__":
+    main()
+    
+    print("\n" + "=" * 50)
+    print("ADDITIONAL VISUALIZATIONS")
+    print("=" * 50)
+    
+    # Optionally create g-g diagram
+    create_ggv = input("\nCreate g-g-V diagram? (y/n): ").lower().strip()
+    if create_ggv == 'y':
+        plot_ggv_diagram()
+    
+    print("\n✅ Python lap simulation complete!")
+    print("📊 All plots have been saved to the outputs/plots/ directory")
+    print("💾 Simulation data saved to outputs/data/ directory")
