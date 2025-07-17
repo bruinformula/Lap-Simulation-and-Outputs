@@ -8,6 +8,12 @@ Calculates realistic velocities based on vehicle dynamics, track geometry, and r
 
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
+import sys
+import os
+
+# Add parent directory to path to import vehicle_config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from vehicle_config import get_vehicle_config, TIRE_MF52_PARAMS
 
 
 def calculate_realistic_velocities(x_coords, y_coords, track_type):
@@ -58,7 +64,7 @@ def calculate_realistic_velocities(x_coords, y_coords, track_type):
 
 def get_vehicle_parameters(track_type):
     """
-    Get vehicle parameters based on track type.
+    Get vehicle parameters based on track type using vehicle_config.py values.
     
     Parameters:
     -----------
@@ -70,15 +76,27 @@ def get_vehicle_parameters(track_type):
     dict
         Vehicle parameter dictionary
     """
-    # Base vehicle parameters (realistic FSAE values)
+    # Get base vehicle configuration from vehicle_config.py
+    config = get_vehicle_config()
+    
+    # Convert units and calculate derived parameters
     vehicle_params = {
-        'mass': 617.4,  # lbs (280 kg)
-        'cg_height': 0.88,  # ft (0.267 m)
-        'wheelbase': 5.09,  # ft (1.55 m)
-        'track_width': 4.0,  # ft (1.22 m)
-        'tire_mu': 1.5,  # realistic peak friction coefficient for FSAE tires
-        'aero_cl': 1.5,  # reduced downforce coefficient
-        'aero_cd': 1.2,  # realistic drag coefficient
+        # Mass properties (convert from metric to imperial for internal calculations)
+        'mass': config['mass'] * 2.205,  # kg to lbs
+        'cg_height': config['cg_height'] * 3.281,  # m to ft
+        'wheelbase': config['wheelbase'] * 3.281,  # m to ft
+        'track_width': config['track_width'] * 3.281,  # m to ft
+        
+        # Tire parameters
+        'tire_mu': TIRE_MF52_PARAMS['mu'],  # Peak friction coefficient
+        
+        # Aerodynamics (convert to imperial units)
+        'aero_cl': config['downforce_coefficient'],
+        'aero_cd': config['drag_coefficient'],
+        'frontal_area': config['frontal_area'] * 10.764,  # m² to ft²
+        'air_density': config['air_density'] * 0.00194,  # kg/m³ to slugs/ft³
+        
+        # Performance limits (realistic estimates based on FSAE capabilities)
         'max_lat_accel': 1.4,  # realistic max lateral g's for FSAE
         'max_lng_accel': 0.8,  # realistic power-limited acceleration
         'max_lng_decel': 1.5,  # realistic braking deceleration
@@ -188,9 +206,13 @@ def calculate_max_cornering_speeds(curvatures, vehicle_params):
             # Calculate downforce at estimated speed (iterative)
             v_est = vehicle_params['base_speed'] * 5280 / 3600  # convert to ft/s for physics
             
-            # Downforce increases effective grip
-            downforce = vehicle_params['aero_cl'] * v_est**2
-            effective_weight = vehicle_params['mass'] + downforce
+            # Downforce calculation: F = 0.5 * ρ * Cl * A * v²
+            # Convert to proper units for imperial system
+            downforce_force = 0.5 * vehicle_params['air_density'] * vehicle_params['aero_cl'] * vehicle_params['frontal_area'] * v_est**2
+            downforce_lbs = downforce_force / 32.2  # convert force to equivalent mass in lbs
+            
+            # Effective weight including downforce
+            effective_weight = vehicle_params['mass'] + downforce_lbs
             
             # Maximum lateral acceleration from tire grip
             max_lat_g = vehicle_params['max_lat_accel'] * vehicle_params['corner_factor']
@@ -252,9 +274,10 @@ def apply_acceleration_limits(x_coords, y_coords, max_cornering_speeds, vehicle_
             # Apply acceleration limit (more generous power model)
             max_accel = vehicle_params['max_lng_accel'] * 32.2  # ft/s²
             
-            # Account for drag (less aggressive drag effect)
-            drag_force = vehicle_params['aero_cd'] * v_prev**2 * 0.5  # Reduce drag impact
-            drag_accel = drag_force / vehicle_params['mass'] * 32.2
+            # Account for drag: F_drag = 0.5 * ρ * Cd * A * v²
+            # Drag force in lbs-force, then convert to acceleration
+            drag_force = 0.5 * vehicle_params['air_density'] * vehicle_params['aero_cd'] * vehicle_params['frontal_area'] * v_prev**2
+            drag_accel = (drag_force / vehicle_params['mass']) * 32.2  # convert to ft/s²
             net_accel = max_accel - drag_accel
             
             # Kinematic equation: v² = v₀² + 2as (more generous acceleration)
