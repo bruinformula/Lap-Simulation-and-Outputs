@@ -57,6 +57,16 @@ DRAG_COEFFICIENT = 0.0184  # Original MATLAB value
 # Realistic FSAE values: 1.0-3.5 with aero package, but using original for demo
 DOWNFORCE_COEFFICIENT = 0.0418  # Original MATLAB value
 
+# Center of pressure longitudinal position from front axle [m] (from MATLAB: 37.4/39.37 = 0.95m)
+COP_LONGITUDINAL_POSITION = 0.95  # Distance from front axle to aerodynamic center of pressure
+
+# Center of pressure height above ground [m] (from MATLAB: 27.5/39.37 = 0.698m)
+COP_HEIGHT = 0.698  # Height of aerodynamic center of pressure above ground
+
+# Front downforce distribution [%] (from MATLAB: CoP = 48%)
+# This represents what percentage of total downforce acts on the front axle
+FRONT_DOWNFORCE_DISTRIBUTION = 48.0  # 48% front, 52% rear
+
 # Air density [kg/m³]
 AIR_DENSITY = 1.225
 
@@ -252,6 +262,9 @@ def get_vehicle_config(enable_aero=None, aero_config=None):
         'frontal_area': FRONTAL_AREA,
         'drag_coefficient': drag_coeff,
         'downforce_coefficient': downforce_coeff,
+        'cop_longitudinal_position': COP_LONGITUDINAL_POSITION,
+        'cop_height': COP_HEIGHT,
+        'front_downforce_distribution': FRONT_DOWNFORCE_DISTRIBUTION / 100.0,  # Convert to decimal
         'air_density': AIR_DENSITY,
         'aero_enabled': aero_enabled,
         'aero_config': aero_config if aero_config else 'realistic',
@@ -312,6 +325,9 @@ def print_vehicle_summary():
     print(f"Frontal Area: {FRONTAL_AREA:.2f} m²")
     print(f"Drag Coefficient: {DRAG_COEFFICIENT:.2f}")
     print(f"Downforce Coefficient: {DOWNFORCE_COEFFICIENT:.2f}")
+    print(f"CoP Longitudinal Position: {COP_LONGITUDINAL_POSITION:.3f} m from front axle")
+    print(f"CoP Height: {COP_HEIGHT:.3f} m above ground")
+    print(f"Front Downforce Distribution: {FRONT_DOWNFORCE_DISTRIBUTION:.1f}%")
     print(f"Peak Friction: {TIRE_MF52_PARAMS['mu']:.2f}")
     print(f"Shift Point: {SHIFT_POINT} RPM")
     print("=" * 50)

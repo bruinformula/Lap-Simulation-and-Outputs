@@ -17,7 +17,7 @@ from vehicle_config import get_vehicle_config, get_powertrain_config, print_vehi
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from lap_simulation import lap_sim
-from lap_simulation.physics import calculate_load_transfer, calculate_roll_angle
+from lap_simulation.physics import calculate_load_transfer, calculate_roll_angle, calculate_realistic_velocities
 from lap_simulation.plotting import (plot_accelerations, plot_corner_loads, 
                                    plot_accelerations_by_sample, plot_roll_angles,
                                    plot_track_only, plot_velocity_profile)
@@ -60,6 +60,27 @@ def main():
         # Pass configurations to simulation
         A_long_g, A_lat_g, distance = lap_sim(endurance_coords, base_dir)
         
+        # Try to load track coordinates for velocity calculation
+        try:
+            track_data = load_track_data_quiet()
+            if track_data and 'endurance' in track_data:
+                x_coords = track_data['endurance']['x_racing']
+                y_coords = track_data['endurance']['y_racing']
+                track_type = 'endurance'
+            else:
+                # If no track data available, create approximate coordinates from distance
+                # This is a fallback - ideally we'd have the actual racing line coordinates
+                x_coords = np.cumsum(np.ones(len(distance)) * 10)  # Rough approximation
+                y_coords = np.zeros(len(distance))  # Straight line approximation
+                track_type = 'endurance'
+                print("Warning: Using approximate coordinates for velocity calculation")
+        except:
+            # Fallback coordinate generation
+            x_coords = np.cumsum(np.ones(len(distance)) * 10)
+            y_coords = np.zeros(len(distance))
+            track_type = 'endurance'
+            print("Warning: Using approximate coordinates for velocity calculation")
+        
     except Exception as e:
         # Create realistic fallback data if simulation fails
         print(f"Simulation failed, using fallback data: {e}")
@@ -73,11 +94,23 @@ def main():
                 A_long_g[i:i+10] = np.random.uniform(-1.2, -0.8, 10)  # Braking
                 A_lat_g[i+10:i+30] = np.random.uniform(1.0, 1.6, 20)  # Cornering
                 A_long_g[i+30:i+50] = np.random.uniform(0.5, 1.0, 20)  # Acceleration
+        
+        # Create approximate coordinates for fallback
+        x_coords = np.cumsum(np.ones(len(distance)) * 10)
+        y_coords = np.zeros(len(distance))
+        track_type = 'endurance'
     
     # Section 2: Physics Calculations (moved to physics module)
     try:
-        # Calculate load transfer using physics module
-        loads = calculate_load_transfer(A_lat_g, A_long_g, vehicle_config)
+        # Calculate realistic velocities using physics-based approach
+        # Convert coordinates to feet if needed (assuming input is in feet)
+        velocities = calculate_realistic_velocities(x_coords, y_coords, track_type, 
+                                                  enable_aero=True, aero_config='original')
+        
+        print(f"Calculated velocities: min={np.min(velocities):.1f} mph, max={np.max(velocities):.1f} mph, avg={np.mean(velocities):.1f} mph")
+        
+        # Calculate load transfer using physics module with realistic velocities
+        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, vehicle_config)
         
         # Calculate roll angles using physics module
         roll_angle = calculate_roll_angle(A_lat_g, vehicle_config)
