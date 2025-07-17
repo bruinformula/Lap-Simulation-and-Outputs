@@ -48,18 +48,10 @@ def load_comprehensive_track_data(base_dir=None):
     
     track_data = {}
     
-    # Load track coordinates using the proper data loader
+        # Load track coordinate data
     try:
-        print("🏁 Loading track coordinate data...")
-        
-        # Load endurance track
-        endurance_file = os.path.join(base_dir, "Endurance_Coordinates_1.xlsx")
-        endurance_data = data_loader.load_track_coordinates(endurance_file)
-        if endurance_data:
-            track_data['endurance'] = endurance_data
-            outside_points = len(endurance_data['outside_track'])
-            inside_points = len(endurance_data['inside_track'])
-            print(f"✓ Endurance: {outside_points} outside, {inside_points} inside boundary points")
+        # Load endurance track data
+        endurance_data = data_loader.load_track_coordinates('Endurance_Coordinates_1.xlsx', base_dir)
         
         # Load autocross track  
         autocross_file = os.path.join(base_dir, "Autocross_Coordinates_2.xlsx")

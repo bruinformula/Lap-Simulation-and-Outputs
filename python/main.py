@@ -18,10 +18,25 @@ from vehicle_config import get_vehicle_config, get_powertrain_config, print_vehi
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from lap_simulation import lap_sim
-from lap_simulation.output_utils import get_plot_path, get_data_path, print_save_message
-from visualization.plot_racing_track import load_comprehensive_track_data
+from lap_simulation.output_utils import get_plot_path, get_data_path
 import pandas as pd
 from scipy.io import loadmat
+
+
+def load_track_data_quiet():
+    """Load track data without verbose logging."""
+    import os
+    import sys
+    from contextlib import redirect_stderr
+    from io import StringIO
+    
+    try:
+        # Suppress stderr during import to hide scipy warnings
+        with redirect_stderr(StringIO()):
+            from visualization.plot_racing_track import load_comprehensive_track_data
+            return load_comprehensive_track_data()
+    except:
+        return None
 
 
 def main():
@@ -29,8 +44,6 @@ def main():
     
     # Set up paths - point to parent directory where Excel files are located
     base_dir = os.path.dirname(os.path.dirname(__file__))
-    
-    print("Starting Python Lap Simulation...")
     
     # Get configurations
     vehicle_config = get_vehicle_config()
@@ -43,12 +56,8 @@ def main():
     try:
         # Pass configurations to simulation
         A_long_g, A_lat_g, distance = lap_sim(endurance_coords, base_dir)
-        print(f"✅ Lap simulation completed - {len(A_lat_g)} data points generated")
         
     except Exception as e:
-        print(f"⚠ Simulation failed: {e}")
-        print("Using fallback data...")
-        
         # Create realistic fallback data if simulation fails
         distance = np.linspace(0, 2000, 500)
         A_long_g = np.random.normal(0, 0.3, 500)
@@ -162,7 +171,7 @@ def main():
         plt.close()
         
     except Exception as e:
-        print(f"⚠ Load calculation failed: {e}")
+        pass
     
     # Additional acceleration plots (matches the second MATLAB figure)
     fig3 = plt.figure(figsize=(12, 8))
@@ -239,13 +248,6 @@ def main():
                delimiter=',', 
                header='Distance_ft,Longitudinal_Accel_g,Lateral_Accel_g,Roll_Angle_deg',
                comments='')
-    
-    # Statistics summary
-    print("\nSimulation Results:")
-    print(f"  Max longitudinal accel: {np.max(A_long_g):.2f} g")
-    print(f"  Max lateral accel: {np.max(A_lat_g):.2f} g") 
-    print(f"  Max roll angle: {np.max(roll_angle):.1f}°")
-    print(f"  Total distance: {distance[-1]:.0f} ft")
 
 
 def plot_track_only(track_data, track_type='endurance', save_name=None):
@@ -413,33 +415,25 @@ def plot_velocity_profile(track_data, track_type='endurance', save_name=None):
 if __name__ == "__main__":
     main()
     
-    print("Creating track visualizations...")
-    
-    # Automatically create endurance track visualization
+    # Automatically create track visualizations
+    track_data = None
     try:
-        track_data = load_comprehensive_track_data()
+        track_data = load_track_data_quiet()
         
         if track_data and 'endurance' in track_data:
             plot_track_only(track_data['endurance'], 'endurance', 'endurance_track_layout.png')
             plot_velocity_profile(track_data['endurance'], 'endurance', 'endurance_velocity_profile.png')
-        else:
-            print("⚠ Endurance track data not available")
             
     except Exception as e:
-        print(f"⚠ Endurance visualization failed: {e}")
+        pass
     
-    # Automatically create autocross track visualization
     try:
-        if 'track_data' not in locals():
-            track_data = load_comprehensive_track_data()
+        if track_data is None:
+            track_data = load_track_data_quiet()
         
         if track_data and 'autocross' in track_data:
             plot_track_only(track_data['autocross'], 'autocross', 'autocross_track_layout.png')
             plot_velocity_profile(track_data['autocross'], 'autocross', 'autocross_velocity_profile.png')
-        else:
-            print("⚠ Autocross track data not available")
             
     except Exception as e:
-        print(f"⚠ Autocross visualization failed: {e}")
-
-    print("✅ Simulation complete - all outputs saved to outputs/ directory")
+        pass

@@ -32,11 +32,7 @@ def lap_sim(lap_coords, base_dir):
         Simulation results matching MATLAB output
     """
     
-    print("Starting Lap Simulation - Python version of Lap_Sim.m")
-    
     # Section 7: Coordinate/Track Data - matches MATLAB exactly
-    print("Section 7: Loading track coordinates...")
-    
     # This matches: [data, ~] = xlsread(lap_coords,'Scaled');
     excel_path = os.path.join(base_dir, lap_coords)
     try:
@@ -58,9 +54,7 @@ def lap_sim(lap_coords, base_dir):
             raise ValueError("No valid numeric track data found")
         
         data = np.array(numeric_data)
-        print(f"Loaded track data with shape: {data.shape}")
     except Exception as e:
-        print(f"Could not load {lap_coords}: {e}")
         # Create dummy track data for fallback
         data = np.array([
             [1, 0, 0, 12, 12],
@@ -81,16 +75,12 @@ def lap_sim(lap_coords, base_dir):
     # Create path_boundaries matrix - matches MATLAB exactly
     # MATLAB: path_boundaries = [Outside_X Outside_Y Inside_X Inside_Y];
     path_boundaries = np.column_stack([Outside_X, Outside_Y, Inside_X, Inside_Y])
-    print(f"Created path_boundaries: {path_boundaries.shape}")
     
     # Section 8: Racing Line Data - matches MATLAB exactly
-    print("Section 8: Loading racing line data...")
-    
     # This matches: load('Data Files/endurance_racing_line.mat');
     racing_line_path = os.path.join(base_dir, 'Data Files', 'endurance_racing_line.mat')
     try:
         racing_line_data = loadmat(racing_line_path)
-        print(f"Loaded racing line data keys: {list(racing_line_data.keys())}")
         
         # Extract racing line coordinates - prioritize high-resolution data
         if 'vehicle_path' in racing_line_data:
@@ -99,7 +89,6 @@ def lap_sim(lap_coords, base_dir):
             if vehicle_path.shape[0] == 2:  # [x_coords; y_coords] format
                 X_racing = vehicle_path[0, :].flatten()
                 Y_racing = vehicle_path[1, :].flatten()
-                print(f"Using high-resolution vehicle_path with {len(X_racing)} points")
             else:
                 X_racing = vehicle_path[:, 0]
                 Y_racing = vehicle_path[:, 1]
@@ -122,17 +111,13 @@ def lap_sim(lap_coords, base_dir):
             else:
                 raise ValueError("Could not find racing line coordinates")
                 
-        print(f"Racing line points: {len(X_racing)}")
-        
     except Exception as e:
-        print(f"Could not load racing line: {e}")
         # Create dummy racing line based on track boundaries
         n_points = len(Outside_X)
         X_racing = (Outside_X + Inside_X) / 2
         Y_racing = (Outside_Y + Inside_Y) / 2
     
     # Section 9-10: Track Processing (simplified for now)
-    print("Sections 9-10: Processing track geometry...")
     
     # Calculate distances between points
     distances = np.zeros(len(X_racing))
@@ -145,15 +130,11 @@ def lap_sim(lap_coords, base_dir):
     distance = np.cumsum(distances)
     
     # Section 11: Lap Information - matches MATLAB exactly
-    print("Section 11: Calculating lap information...")
-    
     # Get vehicle configuration for simulation
     vehicle_config = get_vehicle_config()
     
     # This matches MATLAB: [acceleration, lateral_accel, distance] = lap_information(xx);
     acceleration, lateral_accel, distance = lap_information(X_racing, Y_racing, distance, vehicle_config)
-    
-    print(f"Simulation complete! Generated {len(acceleration)} data points")
     
     return acceleration, lateral_accel, distance
 

@@ -32,9 +32,16 @@ def main():
     
     print("Starting Python Lap Simulation...")
     
+    # Print vehicle configuration summary
+    print_vehicle_summary()
+    
     # Get configurations
     vehicle_config = get_vehicle_config()
     powertrain_config = get_powertrain_config()
+    
+    print("=" * 50)
+    print("SECTION 1: LAP SIMULATION")
+    print("=" * 50)
     
     # Section 1: Getting Longitudinal and Lateral Accelerations around Track
     # This matches the MATLAB: [A_long_g, A_lat_g, distance] = Lap_Sim(endurance_coords);
@@ -43,11 +50,12 @@ def main():
     try:
         # Pass configurations to simulation
         A_long_g, A_lat_g, distance = lap_sim(endurance_coords, base_dir)
-        print(f"✅ Lap simulation completed - {len(A_lat_g)} data points generated")
+        print(f"Lap simulation completed successfully!")
+        print(f"Generated {len(A_lat_g)} data points")
         
     except Exception as e:
-        print(f"⚠ Simulation failed: {e}")
-        print("Using fallback data...")
+        print(f"Error during simulation: {e}")
+        print("Creating fallback data...")
         
         # Create realistic fallback data if simulation fails
         distance = np.linspace(0, 2000, 500)
@@ -63,6 +71,8 @@ def main():
     
     # Section 2: Plot Longitudinal & Lateral Accelerations
     # This matches the MATLAB plotting exactly
+    print("Plotting acceleration traces...")
+    
     N = len(A_lat_g)
     
     # Create figure with MATLAB styling
@@ -85,10 +95,13 @@ def main():
     plt.tight_layout()
     plot_path = get_plot_path('acceleration_plots.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.close()
     
     # Section 3: Plotting Loads
     # This matches the MATLAB load transfer analysis
+    print("Calculating and plotting loads...")
+    
     try:
         # Add tire-load-transfer to path (matches MATLAB: addpath('Scripts/Tire-Load-Transfer'))
         tire_load_path = os.path.join(base_dir, 'Scripts', 'Tire-Load-Transfer')
@@ -159,10 +172,11 @@ def main():
         plt.tight_layout()
         plot_path = get_plot_path('corner_loads.png')
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        print_save_message(plot_path, 'plot')
         plt.close()
         
     except Exception as e:
-        print(f"⚠ Load calculation failed: {e}")
+        print(f"Could not calculate loads: {e}")
     
     # Additional acceleration plots (matches the second MATLAB figure)
     fig3 = plt.figure(figsize=(12, 8))
@@ -192,9 +206,11 @@ def main():
     plt.tight_layout()
     plot_path = get_plot_path('acceleration_by_sample.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.close()
     
     # Roll angle calculation using vehicle config parameters
+    print("Calculating roll angles...")
     
     # Vehicle parameters from config (convert to imperial units for consistency with MATLAB)
     W = vehicle_config['weight'] * 0.224809  # N to lbs
@@ -230,7 +246,18 @@ def main():
     plt.tight_layout()
     plot_path = get_plot_path('roll_angles.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.close()
+    
+    # Statistics summary
+    print("\nSimulation Summary:")
+    print("=" * 30)
+    print(f"Maximum longitudinal acceleration: {np.max(A_long_g):.3f} g")
+    print(f"Minimum longitudinal acceleration: {np.min(A_long_g):.3f} g")
+    print(f"Maximum lateral acceleration: {np.max(A_lat_g):.3f} g")
+    print(f"Average lateral acceleration: {np.mean(A_lat_g):.3f} g")
+    print(f"Maximum roll angle: {np.max(roll_angle):.2f} degrees")
+    print(f"Total distance: {distance[-1]:.1f} ft")
     
     # Save results to file
     results_file = get_data_path('simulation_results.csv')
@@ -239,13 +266,7 @@ def main():
                delimiter=',', 
                header='Distance_ft,Longitudinal_Accel_g,Lateral_Accel_g,Roll_Angle_deg',
                comments='')
-    
-    # Statistics summary
-    print("\nSimulation Results:")
-    print(f"  Max longitudinal accel: {np.max(A_long_g):.2f} g")
-    print(f"  Max lateral accel: {np.max(A_lat_g):.2f} g") 
-    print(f"  Max roll angle: {np.max(roll_angle):.1f}°")
-    print(f"  Total distance: {distance[-1]:.0f} ft")
+    print_save_message(results_file, 'data file')
 
 
 def plot_track_only(track_data, track_type='endurance', save_name=None):
@@ -356,6 +377,7 @@ def plot_track_only(track_data, track_type='endurance', save_name=None):
         save_name = f'{track_type}_track_layout.png'
     plot_path = get_plot_path(save_name)
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.close()
 
 
@@ -407,39 +429,62 @@ def plot_velocity_profile(track_data, track_type='endurance', save_name=None):
         save_name = f'{track_type}_velocity_profile.png'
     plot_path = get_plot_path(save_name)
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print_save_message(plot_path, 'plot')
     plt.close()
 
 
 if __name__ == "__main__":
     main()
     
-    print("Creating track visualizations...")
+    print("\n" + "=" * 50)
+    print("CREATING ADDITIONAL VISUALIZATIONS")
+    print("=" * 50)
     
     # Automatically create endurance track visualization
+    print("\nCreating endurance track visualization...")
     try:
+        # Load track data using the racing track module
+        print("🏁 Loading endurance track data...")
         track_data = load_comprehensive_track_data()
         
         if track_data and 'endurance' in track_data:
+            print("🏁 Plotting Endurance track layout...")
             plot_track_only(track_data['endurance'], 'endurance', 'endurance_track_layout.png')
+            
+            print("📈 Plotting Endurance velocity profile...")
             plot_velocity_profile(track_data['endurance'], 'endurance', 'endurance_velocity_profile.png')
+            
+            print("✅ Endurance track visualizations complete!")
         else:
-            print("⚠ Endurance track data not available")
+            print("⚠ Endurance track data could not be loaded")
             
     except Exception as e:
-        print(f"⚠ Endurance visualization failed: {e}")
+        print(f"❌ Error creating endurance track visualization: {e}")
+        print("   Make sure Endurance_Coordinates_1.xlsx file is available")
     
     # Automatically create autocross track visualization
+    print("\nCreating autocross track visualization...")
     try:
+        # Load track data using the racing track module
+        print("🏁 Loading autocross track data...")
         if 'track_data' not in locals():
             track_data = load_comprehensive_track_data()
         
         if track_data and 'autocross' in track_data:
+            print("🏁 Plotting Autocross track layout...")
             plot_track_only(track_data['autocross'], 'autocross', 'autocross_track_layout.png')
+            
+            print("📈 Plotting Autocross velocity profile...")
             plot_velocity_profile(track_data['autocross'], 'autocross', 'autocross_velocity_profile.png')
+            
+            print("✅ Autocross track visualizations complete!")
         else:
-            print("⚠ Autocross track data not available")
+            print("⚠ Autocross track data could not be loaded")
             
     except Exception as e:
-        print(f"⚠ Autocross visualization failed: {e}")
+        print(f"❌ Error creating autocross track visualization: {e}")
+        print("   Make sure Autocross_Coordinates_2.xlsx file is available")
 
-    print("✅ Simulation complete - all outputs saved to outputs/ directory")
+    print(f"\n✅ Python lap simulation complete!")
+    print(f"📊 All plots have been saved to the outputs/plots/ directory")
+    print(f"💾 Simulation data saved to outputs/data/ directory")
