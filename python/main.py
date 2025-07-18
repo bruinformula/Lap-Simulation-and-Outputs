@@ -17,7 +17,8 @@ from vehicle_config import get_vehicle_config, get_powertrain_config, print_vehi
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from lap_simulation import lap_sim
-from lap_simulation.physics import calculate_load_transfer, calculate_roll_angle, calculate_realistic_velocities
+from lap_simulation.physics import calculate_roll_angle, calculate_realistic_velocities
+from lap_simulation.individual_wheel_physics import calculate_individual_wheel_loads, calculate_suspension_effects
 from lap_simulation.plotting import (plot_accelerations, plot_corner_loads, 
                                    plot_accelerations_by_sample, plot_roll_angles,
                                    plot_track_only, plot_velocity_profile)
@@ -51,6 +52,11 @@ def main():
     # Get configurations
     vehicle_config = get_vehicle_config()
     powertrain_config = get_powertrain_config()
+    
+    print("Python Lap Simulation - Enhanced with Phase 1 Physics")
+    print("="*60)
+    print("Features: Individual wheel loads, suspension effects, enhanced accuracy")
+    print()
     
     # Section 1: Getting Longitudinal and Lateral Accelerations around Track
     # This matches the MATLAB: [A_long_g, A_lat_g, distance] = Lap_Sim(endurance_coords);
@@ -100,7 +106,7 @@ def main():
         y_coords = np.zeros(len(distance))
         track_type = 'endurance'
     
-    # Section 2: Physics Calculations (moved to physics module)
+    # Section 2: Physics Calculations (enhanced with Phase 1)
     try:
         # Calculate realistic velocities using physics-based approach
         # Convert coordinates to feet if needed (assuming input is in feet)
@@ -109,11 +115,39 @@ def main():
         
         print(f"Calculated velocities: min={np.min(velocities):.1f} mph, max={np.max(velocities):.1f} mph, avg={np.mean(velocities):.1f} mph")
         
-        # Calculate load transfer using physics module with realistic velocities
-        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, vehicle_config)
+        # Phase 1: Calculate individual wheel loads instead of simple load transfer
+        print("Applying Phase 1 physics enhancements...")
         
-        # Calculate roll angles using physics module
-        roll_angle = calculate_roll_angle(A_lat_g, vehicle_config)
+        # Convert velocities for calculations
+        velocities_ms = velocities * 0.44704  # mph to m/s
+        
+        # Calculate individual wheel loads using Phase 1 physics
+        wheel_loads = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities_ms, vehicle_config)
+        
+        # Calculate suspension effects
+        suspension_effects = calculate_suspension_effects(A_lat_g, A_long_g, vehicle_config)
+        
+        # Calculate roll angles using individual wheel suspension model
+        roll_angle = suspension_effects['roll_angle_front']  # Use individual wheel roll angles
+        
+        # Also calculate standard loads for comparison - convert mph to m/s
+        velocities_ms = velocities * 0.44704  # Convert mph to m/s for individual wheel physics
+        loads_standard = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities_ms, vehicle_config)
+        
+        # Combine individual wheel results into loads dictionary for compatibility
+        loads = {
+            'FL': wheel_loads['FL'],
+            'FR': wheel_loads['FR'], 
+            'RL': wheel_loads['RL'],
+            'RR': wheel_loads['RR']
+        }
+        
+        # Print Phase 1 enhancement summary
+        print(f"Phase 1 Physics Applied:")
+        print(f"  - Individual wheel loads: FL={np.mean(loads['FL']):.0f}N, FR={np.mean(loads['FR']):.0f}N")
+        print(f"  - Load transfer range: {np.ptp(loads['FL'] + loads['FR']):.0f}N front axle")
+        print(f"  - Suspension roll: {np.mean(np.rad2deg(roll_angle)):.2f}° average")
+        print(f"  - Camber change: {np.mean(np.rad2deg(suspension_effects['camber_change_front'])):.2f}° front")
         
     except Exception as e:
         print(f"Physics calculations failed: {e}")

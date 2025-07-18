@@ -38,8 +38,7 @@ Acceleration Calculations:
 Vehicle Dynamics:
 ----------------
 16. calculate_aerodynamic_forces()         - Aerodynamic downforce and drag with center of pressure
-17. calculate_load_transfer()              - Individual wheel loads with load transfer and aerodynamics  
-18. calculate_roll_angle()                 - Vehicle body roll angle during cornering
+17. calculate_roll_angle()                 - Vehicle body roll angle during cornering
 
 Utility Functions:
 -----------------
@@ -453,16 +452,16 @@ def calculate_cumulative_distance(x_coords, y_coords):
     return distances
 
 
-def estimate_lap_time(distances, velocities):
+def estimate_lap_time(velocities, distances):
     """
-    Estimate lap time from distance and velocity arrays.
+    Estimate lap time from velocity and distance arrays.
     
     Parameters:
     -----------
-    distances : np.ndarray
-        Cumulative distance array
     velocities : np.ndarray
         Velocity array in mph
+    distances : np.ndarray
+        Cumulative distance array in meters
         
     Returns:
     --------
@@ -472,9 +471,9 @@ def estimate_lap_time(distances, velocities):
     lap_time = 0
     for i in range(len(velocities)-1):
         if velocities[i] > 0:
-            distance_segment = distances[i+1] - distances[i]
-            velocity_fps = velocities[i] * 5280 / 3600  # convert mph to ft/s
-            time_segment = distance_segment / velocity_fps if velocity_fps > 0 else 0
+            distance_segment = distances[i+1] - distances[i]  # meters
+            velocity_mps = velocities[i] * 0.44704  # convert mph to m/s
+            time_segment = distance_segment / velocity_mps if velocity_mps > 0 else 0
             lap_time += time_segment
     
     return lap_time
@@ -557,130 +556,6 @@ def calculate_aerodynamic_forces(velocities, vehicle_params):
         aero_forces['downforce_pitch_moment'][i] = downforce_pitch_moment
     
     return aero_forces
-
-
-def calculate_load_transfer(A_lat_g, A_long_g, velocities, vehicle_config):
-    """
-    Calculate individual wheel loads accounting for lateral and longitudinal load transfer,
-    including aerodynamic effects with center of pressure.
-    
-    Based on MATLAB Lap_Sim methodology with aerodynamic load distribution.
-    
-    Parameters:
-    -----------
-    A_lat_g : np.ndarray
-        Lateral acceleration in g-force
-    A_long_g : np.ndarray
-        Longitudinal acceleration in g-force
-    velocities : np.ndarray
-        Velocity array in mph for aerodynamic calculations
-    vehicle_config : dict
-        Vehicle configuration parameters
-        
-    Returns:
-    --------
-    dict
-        Dictionary with arrays for each wheel load: 'FL', 'FR', 'RL', 'RR' in lbs
-    """
-    N = len(A_lat_g)
-    
-    # Initialize load arrays
-    loads = {
-        'FL': np.zeros(N),  # Front Left
-        'FR': np.zeros(N),  # Front Right
-        'RL': np.zeros(N),  # Rear Left
-        'RR': np.zeros(N)   # Rear Right
-    }
-    
-    # Calculate aerodynamic forces - need to convert config to params format
-    # Create a minimal vehicle_params dict for aerodynamic calculations
-    vehicle_params_for_aero = {
-        'aero_cl': vehicle_config.get('downforce_coefficient', 0.0),
-        'aero_cd': vehicle_config.get('drag_coefficient', 0.0),
-        'frontal_area': vehicle_config.get('frontal_area', 1.2) * 10.764,  # m² to ft²
-        'air_density': vehicle_config.get('air_density', 1.225) * 0.00194,  # kg/m³ to slugs/ft³
-        'aero_enabled': vehicle_config.get('aero_enabled', True),
-        'front_downforce_distribution': vehicle_config.get('front_downforce_distribution', 0.48),
-        'cop_longitudinal_position': vehicle_config.get('cop_longitudinal_position', 0.95) * 3.281,  # m to ft
-        'cop_height': vehicle_config.get('cop_height', 0.698) * 3.281,  # m to ft
-        'wheelbase': vehicle_config.get('wheelbase', 1.55) * 3.281,  # m to ft
-    }
-    
-    aero_forces = calculate_aerodynamic_forces(velocities, vehicle_params_for_aero)
-    
-    # Use metric units consistently - vehicle_config weight is already in N
-    total_weight_N = vehicle_config['weight']  # Already in N
-    
-    # Front and rear weight distribution based on CG position
-    wheelbase_m = vehicle_config['wheelbase']  # Already in m
-    cg_x_m = vehicle_config['cg_x']  # Already in m
-    
-    # Weight distribution percentages
-    front_weight_percent = (wheelbase_m - cg_x_m) / wheelbase_m
-    rear_weight_percent = cg_x_m / wheelbase_m
-    
-    # Static loads per axle in N
-    static_front_total = total_weight_N * front_weight_percent
-    static_rear_total = total_weight_N * rear_weight_percent
-    
-    # Track widths in m
-    track_width_front = vehicle_config.get('track_width_front', vehicle_config['track_width'])  # m
-    track_width_rear = vehicle_config.get('track_width_rear', vehicle_config['track_width'])  # m
-    
-    for i in range(N):
-        # Base static loads per wheel (half of total axle load)
-        base_front_per_wheel = static_front_total / 2.0
-        base_rear_per_wheel = static_rear_total / 2.0
-        
-        # Add aerodynamic downforce (convert from lbs to N)
-        front_aero_per_wheel = aero_forces['front_downforce'][i] * 4.44822 / 2.0  # lbs to N, then per wheel
-        rear_aero_per_wheel = aero_forces['rear_downforce'][i] * 4.44822 / 2.0  # lbs to N, then per wheel
-        
-        # Total normal loads including aerodynamics
-        front_total_per_wheel = base_front_per_wheel + front_aero_per_wheel
-        rear_total_per_wheel = base_rear_per_wheel + rear_aero_per_wheel
-        
-        # Lateral load transfer (based on lateral acceleration and CG height)
-        # Formula: ΔF = (a_y * m * h) / track_width, where a_y is in m/s²
-        cg_height_m = vehicle_config['cg_height']  # m
-        lat_transfer_front = A_lat_g[i] * 9.81 * (static_front_total / 9.81) * cg_height_m / track_width_front  # N
-        lat_transfer_rear = A_lat_g[i] * 9.81 * (static_rear_total / 9.81) * cg_height_m / track_width_rear  # N
-        
-        # Longitudinal load transfer (based on longitudinal acceleration and CG height)
-        # Formula: ΔF = (a_x * m * h) / wheelbase, where a_x is in m/s²
-        long_transfer_total = A_long_g[i] * 9.81 * (total_weight_N / 9.81) * cg_height_m / wheelbase_m  # N
-        long_transfer_front = -long_transfer_total  # Negative because acceleration reduces front load
-        long_transfer_rear = long_transfer_total   # Positive because acceleration increases rear load
-        
-        # Additional longitudinal load transfer from aerodynamic pitch moment
-        # The center of pressure position affects front/rear load distribution
-        if 'downforce_pitch_moment' in aero_forces:
-            aero_pitch_moment = aero_forces['downforce_pitch_moment'][i] * 1.35582  # Convert ft-lbs to N-m
-            # Convert pitch moment to additional longitudinal load transfer
-            aero_long_transfer = aero_pitch_moment / wheelbase_m  # N
-            # Distribute based on whether CoP is ahead or behind CG
-            cop_x_m = vehicle_config['cop_longitudinal_position']  # m
-            if cop_x_m > cg_x_m:  # CoP behind CG - increases rear load
-                long_transfer_front -= aero_long_transfer
-                long_transfer_rear += aero_long_transfer
-            else:  # CoP ahead of CG - increases front load
-                long_transfer_front += aero_long_transfer
-                long_transfer_rear -= aero_long_transfer
-        
-        # Calculate individual corner loads
-        # Front wheels: add/subtract lateral transfer, add/subtract longitudinal transfer
-        loads['FL'][i] = front_total_per_wheel - lat_transfer_front - long_transfer_front
-        loads['FR'][i] = front_total_per_wheel + lat_transfer_front - long_transfer_front
-        
-        # Rear wheels: add/subtract lateral transfer, opposite longitudinal transfer
-        loads['RL'][i] = rear_total_per_wheel - lat_transfer_rear + long_transfer_rear  
-        loads['RR'][i] = rear_total_per_wheel + lat_transfer_rear + long_transfer_rear
-        
-        # Ensure no negative loads (wheels lifting off)
-        for key in loads:
-            loads[key][i] = max(0, loads[key][i])
-    
-    return loads
 
 
 def calculate_roll_angle(A_lat_g, vehicle_config):

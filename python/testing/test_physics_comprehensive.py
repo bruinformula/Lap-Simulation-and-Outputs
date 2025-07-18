@@ -29,12 +29,13 @@ from vehicle_config import (
 )
 from lap_simulation.physics import (
     calculate_realistic_velocities, calculate_aerodynamic_forces,
-    calculate_load_transfer, calculate_longitudinal_acceleration,
+    calculate_longitudinal_acceleration,
     calculate_lateral_acceleration_from_velocity, get_vehicle_parameters,
     calculate_track_curvature, calculate_max_cornering_speeds,
     apply_acceleration_limits, apply_deceleration_limits,
     estimate_lap_time, calculate_cumulative_distance
 )
+from lap_simulation.individual_wheel_physics import calculate_individual_wheel_loads
 from lap_simulation.powertrain import PowertrainModel
 
 
@@ -181,9 +182,9 @@ class TestLoadTransferAccuracy:
         n_points = 5
         A_lat_g = np.zeros(n_points)
         A_long_g = np.zeros(n_points)
-        velocities = np.full(n_points, 30.0)  # mph
+        velocities = np.full(n_points, 30.0 * 0.44704)  # Convert mph to m/s
         
-        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, config)
+        loads = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities, config)
         
         # With zero acceleration, loads should be close to static
         expected_front = config['static_load_front']
@@ -202,9 +203,9 @@ class TestLoadTransferAccuracy:
         n_points = 1
         A_lat_g = np.array([1.0])  # 1g lateral acceleration
         A_long_g = np.zeros(n_points)
-        velocities = np.array([30.0])  # mph
+        velocities = np.array([30.0 * 0.44704])  # Convert mph to m/s
         
-        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, config)
+        loads = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities, config)
         
         # Total load on each axle should remain the same
         front_total = loads['FL'][0] + loads['FR'][0]
@@ -228,9 +229,9 @@ class TestLoadTransferAccuracy:
         # Test acceleration, steady state, braking
         A_long_g = np.array([1.0, 0.0, -1.0])  # 1g accel, 0g, 1g braking
         A_lat_g = np.zeros(n_points)
-        velocities = np.array([30.0, 30.0, 30.0])  # mph
+        velocities = np.array([30.0, 30.0, 30.0]) * 0.44704  # Convert mph to m/s
         
-        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, config)
+        loads = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities, config)
         
         # Under acceleration (positive), rear should have more load
         rear_accel = loads['RL'][0] + loads['RR'][0]

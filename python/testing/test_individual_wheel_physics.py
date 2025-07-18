@@ -1,10 +1,24 @@
 """
-Phase 1 Physics Test Suite
-==========================
+Comprehensive Test Suite for Individual Wheel Physics
+=====================================================
 
-Comprehensive test suite for Phase 1 physics implementations.
-Validates against MATLAB Lap_Sim.m calculations.
+Tests all functions in the individual wheel physics module to ensure accuracy
+and reliability of the enhanced vehicle dynamics calculations.
 """
+
+import numpy as np
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from lap_simulation.individual_wheel_physics import (
+    calculate_individual_wheel_loads,
+    calculate_suspension_effects,
+    calculate_slip_angles_and_yaw_moment
+)
+from vehicle_config import get_vehicle_config
 
 import numpy as np
 import pytest
@@ -14,7 +28,7 @@ import os
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lap_simulation.phase1_physics import (
+from lap_simulation.individual_wheel_physics import (
     calculate_individual_wheel_loads,
     calculate_slip_angles_and_yaw_moment,
     calculate_suspension_effects,
@@ -309,7 +323,7 @@ class TestPhase1Physics:
 
 def run_phase1_tests():
     """Run all Phase 1 tests and report results."""
-    print("Running Phase 1 Physics Test Suite")
+    print("Individual Wheel Physics Test Suite")
     print("=" * 50)
     
     # Initialize test class
@@ -353,7 +367,7 @@ def run_phase1_tests():
     print(f"Success Rate: {passed / (passed + failed) * 100:.1f}%")
     
     if failed == 0:
-        print("All Phase 1 tests passed! ✓")
+        print("All individual wheel physics tests passed! ✓")
     else:
         print(f"Phase 1 implementation needs attention ({failed} failures)")
     

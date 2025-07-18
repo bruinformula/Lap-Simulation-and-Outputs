@@ -35,9 +35,10 @@ from lap_simulation.plotting import (
 )
 from lap_simulation.physics import (
     calculate_cumulative_distance, calculate_track_curvature,
-    calculate_realistic_velocities, calculate_load_transfer,
+    calculate_realistic_velocities,
     calculate_longitudinal_acceleration, calculate_lateral_acceleration_from_velocity
 )
+from lap_simulation.individual_wheel_physics import calculate_individual_wheel_loads
 
 
 class DummyTrackGenerator:
@@ -489,8 +490,10 @@ class TestCompletePhysicsPlotting:
         A_long_g = calculate_longitudinal_acceleration(velocities, distances, self.config)
         A_lat_g = calculate_lateral_acceleration_from_velocity(velocities, curvatures, self.config)
         
-        # Calculate load transfer
-        loads = calculate_load_transfer(A_lat_g, A_long_g, velocities, self.config)
+        # Calculate load transfer using individual wheel physics
+        # Convert velocities from mph to m/s for the new function
+        velocities_ms = velocities * 0.44704
+        loads = calculate_individual_wheel_loads(A_lat_g, A_long_g, velocities_ms, self.config)
         
         # Calculate roll angles (simplified)
         roll_angle = A_lat_g * 2.0  # Simplified roll calculation

@@ -1,13 +1,20 @@
 """
-Phase 1 Physics Implementation: Individual Wheel Load and Force Calculations
-===========================================================================
+Individual Wheel Physics - Advanced Vehicle Dynamics
+====================================================
 
-This module implements the missing physics computations from Phase 1 of the roadmap:
-1. Individual wheel load calculations with LLTD
-2. Yaw moment balance and slip angle calculations  
-3. Basic suspension kinematics
+This module implements individual wheel load calculations, suspension effects,
+and advanced vehicle dynamics that provide realistic tire loading and suspension
+behavior for accurate lap simulation.
 
-All calculations are based on the MATLAB Lap_Sim.m implementation.
+CAPABILITIES:
+- Individual wheel load calculations (FL, FR, RL, RR) instead of axle totals
+- Suspension kinematics (roll angles, camber changes) affecting tire performance
+- Slip angle calculations for each wheel based on actual loads
+- Yaw moment calculations from asymmetric tire forces
+- Load transfer distribution using Lateral Load Transfer Distribution (LLTD)
+
+These physics provide the foundation for realistic tire modeling and enable
+detailed vehicle dynamics analysis that standard physics approaches miss.
 """
 
 import numpy as np
