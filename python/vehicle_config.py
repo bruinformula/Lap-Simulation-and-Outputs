@@ -110,6 +110,24 @@ ROLL_STIFFNESS_REAR_ARB = 1174.436
 ROLL_STIFFNESS_FRONT_TOTAL = ROLL_STIFFNESS_FRONT_SPRINGS + ROLL_STIFFNESS_FRONT_ARB
 ROLL_STIFFNESS_REAR_TOTAL = ROLL_STIFFNESS_REAR_SPRINGS + ROLL_STIFFNESS_REAR_ARB
 
+# Phase 1 Parameters - Individual Wheel Load Calculations (from MATLAB)
+LATERAL_LOAD_TRANSFER_DISTRIBUTION = 0.51  # LLTD (from MATLAB: 51%)
+ROLL_GRADIENT_FRONT = 1.15  # deg/g (from MATLAB: rg_f = 1.15)
+ROLL_GRADIENT_REAR = 1.15   # deg/g (from MATLAB: rg_r = 1.15)
+PITCH_GRADIENT = 0.0        # deg/g (from MATLAB: pg = 0)
+
+# Suspension kinematics parameters (from MATLAB)
+CAMBER_GAIN_FRONT = 0.1     # deg/deg (calculated from MATLAB IA_gainf)
+CAMBER_GAIN_REAR = 0.2      # deg/deg (calculated from MATLAB IA_gainr)
+KINGPIN_INCLINATION_FRONT = 7.18  # deg (from MATLAB: KPIf = 7.18)
+KINGPIN_INCLINATION_REAR = 8.49   # deg (from MATLAB: KPIr = 8.49)
+CASTER_ANGLE_FRONT = 4.0    # deg (from MATLAB: casterf = 4)
+CASTER_ANGLE_REAR = 4.0     # deg (from MATLAB: casterr = 4)
+
+# Tire cornering stiffness parameters (will be calculated from tire model)
+CORNERING_STIFFNESS_FRONT = 1200  # N/rad (placeholder - will use Magic Formula)
+CORNERING_STIFFNESS_REAR = 1100   # N/rad (placeholder - will use Magic Formula)
+
 
 # =============================================================================
 # TIRE PARAMETERS
@@ -274,6 +292,34 @@ def get_vehicle_config(enable_aero=None, aero_config=None):
         'roll_center_rear': ROLL_CENTER_REAR,
         'roll_stiffness_front': ROLL_STIFFNESS_FRONT_TOTAL,
         'roll_stiffness_rear': ROLL_STIFFNESS_REAR_TOTAL,
+        
+        # Phase 1 - Individual wheel load calculations (from MATLAB)
+        'LLTD': LATERAL_LOAD_TRANSFER_DISTRIBUTION,
+        'roll_gradient_front': ROLL_GRADIENT_FRONT,
+        'roll_gradient_rear': ROLL_GRADIENT_REAR,
+        'pitch_gradient': PITCH_GRADIENT,
+        'camber_gain_front': CAMBER_GAIN_FRONT,
+        'camber_gain_rear': CAMBER_GAIN_REAR,
+        'kingpin_inclination_front': KINGPIN_INCLINATION_FRONT,
+        'kingpin_inclination_rear': KINGPIN_INCLINATION_REAR,
+        'caster_angle_front': CASTER_ANGLE_FRONT,
+        'caster_angle_rear': CASTER_ANGLE_REAR,
+        'cornering_stiffness_front': CORNERING_STIFFNESS_FRONT,
+        'cornering_stiffness_rear': CORNERING_STIFFNESS_REAR,
+        
+        # Phase 1 parameters - Individual wheel calculations
+        'LLTD': LATERAL_LOAD_TRANSFER_DISTRIBUTION,
+        'roll_gradient_front': ROLL_GRADIENT_FRONT,
+        'roll_gradient_rear': ROLL_GRADIENT_REAR,
+        'pitch_gradient': PITCH_GRADIENT,
+        'camber_gain_front': CAMBER_GAIN_FRONT,
+        'camber_gain_rear': CAMBER_GAIN_REAR,
+        'kingpin_inclination_front': KINGPIN_INCLINATION_FRONT,
+        'kingpin_inclination_rear': KINGPIN_INCLINATION_REAR,
+        'caster_angle_front': CASTER_ANGLE_FRONT,
+        'caster_angle_rear': CASTER_ANGLE_REAR,
+        'cornering_stiffness_front': CORNERING_STIFFNESS_FRONT,
+        'cornering_stiffness_rear': CORNERING_STIFFNESS_REAR,
         
         # Tires
         'tire_radius': TIRE_RADIUS,
