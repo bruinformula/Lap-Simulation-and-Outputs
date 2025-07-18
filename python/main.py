@@ -18,10 +18,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from lap_simulation import lap_sim
 from lap_simulation.physics import calculate_roll_angle, calculate_realistic_velocities
-from lap_simulation.individual_wheel_physics import calculate_individual_wheel_loads, calculate_suspension_effects
+from lap_simulation.individual_wheel_physics import (calculate_individual_wheel_loads, calculate_suspension_effects,
+                                                    calculate_slip_angles_and_yaw_moment_arrays)
 from lap_simulation.plotting import (plot_accelerations, plot_corner_loads, 
                                    plot_accelerations_by_sample, plot_roll_angles,
-                                   plot_track_only, plot_velocity_profile)
+                                   plot_track_only, plot_velocity_profile,
+                                   plot_slip_angles, plot_yaw_moment, plot_vehicle_dynamics_summary)
 from lap_simulation.data_export import save_simulation_results, create_summary_report, print_summary_report
 import pandas as pd
 from scipy.io import loadmat
@@ -107,6 +109,9 @@ def main():
         track_type = 'endurance'
     
     # Section 2: Physics Calculations (enhanced with Phase 1)
+    # Initialize default velocities
+    velocities = np.ones(len(distance)) * 30  # Default 30 mph
+    
     try:
         # Calculate realistic velocities using physics-based approach
         # Convert coordinates to feet if needed (assuming input is in feet)
@@ -149,6 +154,23 @@ def main():
         print(f"  - Suspension roll: {np.mean(np.rad2deg(roll_angle)):.2f}° average")
         print(f"  - Camber change: {np.mean(np.rad2deg(suspension_effects['camber_change_front'])):.2f}° front")
         
+        # Calculate slip angles and yaw moment
+        print("Calculating vehicle dynamics (slip angles and yaw moment)...")
+        vehicle_dynamics = calculate_slip_angles_and_yaw_moment_arrays(
+            velocities, x_coords, y_coords, vehicle_config
+        )
+        
+        slip_angles_data = {
+            'front': vehicle_dynamics['front'],
+            'rear': vehicle_dynamics['rear']
+        }
+        yaw_moment = vehicle_dynamics['yaw_moment']
+        
+        print(f"Vehicle Dynamics Calculated:")
+        print(f"  - Front slip angle range: ±{np.rad2deg(np.max(np.abs(slip_angles_data['front']))):.2f}°")
+        print(f"  - Rear slip angle range: ±{np.rad2deg(np.max(np.abs(slip_angles_data['rear']))):.2f}°")
+        print(f"  - Yaw moment range: ±{np.max(np.abs(yaw_moment)):.0f} Nm")
+        
     except Exception as e:
         print(f"Physics calculations failed: {e}")
         # Create fallback data
@@ -160,6 +182,14 @@ def main():
             'RR': np.ones(N) * 150
         }
         roll_angle = np.zeros(N)
+        
+        # Create fallback vehicle dynamics data
+        slip_angles_data = {
+            'front': np.zeros(N),
+            'rear': np.zeros(N)
+        }
+        yaw_moment = np.zeros(N)
+        velocities = np.ones(N) * 30  # Default fallback velocities
     
     # Section 3: Generate Plots (moved to plotting module)
     try:
@@ -174,6 +204,15 @@ def main():
         
         # Plot roll angles
         plot_roll_angles(distance, roll_angle)
+        
+        # Plot slip angles
+        plot_slip_angles(distance, slip_angles_data, 'Endurance Track')
+        
+        # Plot yaw moment
+        plot_yaw_moment(distance, yaw_moment, 'Endurance Track')
+        
+        # Plot comprehensive vehicle dynamics summary
+        plot_vehicle_dynamics_summary(distance, slip_angles_data, yaw_moment, velocities, 'Endurance Track')
         
     except Exception as e:
         print(f"Plotting failed: {e}")

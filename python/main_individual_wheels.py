@@ -23,8 +23,10 @@ from lap_simulation import lap_sim
 from lap_simulation.physics import (calculate_realistic_velocities, estimate_lap_time,
                                    calculate_track_curvature, calculate_distance_array)
 from lap_simulation.individual_wheel_physics import (calculate_individual_wheel_loads,
-                                                    calculate_suspension_effects)
-from lap_simulation.plotting import plot_velocity_profile
+                                                    calculate_suspension_effects,
+                                                    calculate_slip_angles_and_yaw_moment_arrays)
+from lap_simulation.plotting import (plot_velocity_profile, plot_slip_angles, plot_yaw_moment, 
+                                   plot_vehicle_dynamics_summary)
 from lap_simulation.data_export import save_simulation_results
 import pandas as pd
 from scipy.io import loadmat
@@ -204,6 +206,23 @@ def run_comparison():
     print("  Individual wheel physics (realistic loading)...")
     enhanced_velocities, _ = calculate_enhanced_velocities(x_coords, y_coords, vehicle_config)
     
+    # Calculate slip angles and yaw moment for enhanced physics
+    print("  Calculating vehicle dynamics (slip angles and yaw moment)...")
+    vehicle_dynamics = calculate_slip_angles_and_yaw_moment_arrays(
+        enhanced_velocities, x_coords, y_coords, vehicle_config
+    )
+    
+    slip_angles_data = {
+        'front': vehicle_dynamics['front'],
+        'rear': vehicle_dynamics['rear']
+    }
+    yaw_moment = vehicle_dynamics['yaw_moment']
+    
+    print(f"    Vehicle dynamics calculated:")
+    print(f"    - Front slip angle range: ±{np.rad2deg(np.max(np.abs(slip_angles_data['front']))):.2f}°")
+    print(f"    - Rear slip angle range: ±{np.rad2deg(np.max(np.abs(slip_angles_data['rear']))):.2f}°")
+    print(f"    - Yaw moment range: ±{np.max(np.abs(yaw_moment)):.0f} Nm")
+    
     # Calculate lap times
     print("  Calculating lap times...")
     standard_lap_time = estimate_lap_time(standard_velocities, distance)
@@ -261,6 +280,12 @@ def run_comparison():
     create_comparison_plot(distance, standard_velocities, enhanced_velocities, 
                           x_coords, y_coords, standard_lap_time, enhanced_lap_time)
     
+    # Create vehicle dynamics plots
+    print("Creating vehicle dynamics plots...")
+    plot_slip_angles(distance, slip_angles_data, 'Endurance Track - Individual Wheel Physics')
+    plot_yaw_moment(distance, yaw_moment, 'Endurance Track - Individual Wheel Physics')
+    plot_vehicle_dynamics_summary(distance, slip_angles_data, yaw_moment, enhanced_velocities, 'Endurance Track - Individual Wheel Physics')
+    
     return {
         'standard_lap_time': standard_lap_time,
         'enhanced_lap_time': enhanced_lap_time,
@@ -268,7 +293,9 @@ def run_comparison():
         'velocity_improvement': vel_diff_avg,
         'standard_velocities': standard_velocities,
         'enhanced_velocities': enhanced_velocities,
-        'distance': distance
+        'distance': distance,
+        'slip_angles_data': slip_angles_data,
+        'yaw_moment': yaw_moment
     }
 
 

@@ -331,3 +331,155 @@ def plot_velocity_profile(track_data, track_type='endurance', save_name=None):
     plot_path = get_plot_path(save_name)
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
+
+
+def plot_slip_angles(distance, slip_angles_data, track_name='Track'):
+    """
+    Plot front and rear slip angles vs distance.
+    
+    Parameters:
+    -----------
+    distance : np.ndarray
+        Distance array in feet or meters
+    slip_angles_data : Dict
+        Dictionary containing 'front' and 'rear' slip angles in radians
+    track_name : str
+        Name of the track for plot title
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Convert slip angles from radians to degrees for plotting
+    front_slip_deg = np.rad2deg(slip_angles_data['front'])
+    rear_slip_deg = np.rad2deg(slip_angles_data['rear'])
+    
+    # Plot slip angles
+    ax.plot(distance, front_slip_deg, 'b-', linewidth=2, label='Front Slip Angle', alpha=0.8)
+    ax.plot(distance, rear_slip_deg, 'r-', linewidth=2, label='Rear Slip Angle', alpha=0.8)
+    
+    # Formatting
+    ax.set_title(f'{track_name} - Slip Angles', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('Distance Along Track [ft]', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Slip Angle [degrees]', fontsize=12, fontweight='bold')
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.legend(fontsize=12)
+    
+    # Add zero line for reference
+    ax.axhline(y=0, color='k', linestyle='-', alpha=0.3, linewidth=0.8)
+    
+    # Add statistics
+    front_max = np.max(np.abs(front_slip_deg))
+    rear_max = np.max(np.abs(rear_slip_deg))
+    front_avg = np.mean(np.abs(front_slip_deg))
+    rear_avg = np.mean(np.abs(rear_slip_deg))
+    
+    info_text = f'Front Max: ±{front_max:.2f}°\nRear Max: ±{rear_max:.2f}°\nFront Avg: {front_avg:.2f}°\nRear Avg: {rear_avg:.2f}°'
+    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+            fontsize=11)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_path = get_plot_path('slip_angles.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_yaw_moment(distance, yaw_moment, track_name='Track'):
+    """
+    Plot yaw moment vs distance.
+    
+    Parameters:
+    -----------
+    distance : np.ndarray
+        Distance array in feet or meters
+    yaw_moment : np.ndarray
+        Yaw moment in Nm
+    track_name : str
+        Name of the track for plot title
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Plot yaw moment
+    ax.plot(distance, yaw_moment, 'purple', linewidth=2, label='Yaw Moment', alpha=0.8)
+    
+    # Formatting
+    ax.set_title(f'{track_name} - Yaw Moment', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('Distance Along Track [ft]', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Yaw Moment [Nm]', fontsize=12, fontweight='bold')
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.legend(fontsize=12)
+    
+    # Add zero line for reference
+    ax.axhline(y=0, color='k', linestyle='-', alpha=0.3, linewidth=0.8)
+    
+    # Add statistics
+    max_moment = np.max(np.abs(yaw_moment))
+    avg_moment = np.mean(np.abs(yaw_moment))
+    std_moment = np.std(yaw_moment)
+    
+    info_text = f'Max: ±{max_moment:.0f} Nm\nAvg: {avg_moment:.0f} Nm\nStd: {std_moment:.0f} Nm'
+    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+            fontsize=11)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_path = get_plot_path('yaw_moment.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_vehicle_dynamics_summary(distance, slip_angles_data, yaw_moment, velocities, track_name='Track'):
+    """
+    Create a comprehensive vehicle dynamics summary plot with slip angles, yaw moment, and velocity.
+    
+    Parameters:
+    -----------
+    distance : np.ndarray
+        Distance array in feet or meters
+    slip_angles_data : Dict
+        Dictionary containing 'front' and 'rear' slip angles in radians
+    yaw_moment : np.ndarray
+        Yaw moment in Nm
+    velocities : np.ndarray
+        Vehicle velocities in mph
+    track_name : str
+        Name of the track for plot title
+    """
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
+    
+    # Convert slip angles from radians to degrees
+    front_slip_deg = np.rad2deg(slip_angles_data['front'])
+    rear_slip_deg = np.rad2deg(slip_angles_data['rear'])
+    
+    # Plot 1: Slip Angles
+    ax1.plot(distance, front_slip_deg, 'b-', linewidth=2, label='Front Slip Angle', alpha=0.8)
+    ax1.plot(distance, rear_slip_deg, 'r-', linewidth=2, label='Rear Slip Angle', alpha=0.8)
+    ax1.set_ylabel('Slip Angle [degrees]', fontsize=12, fontweight='bold')
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.legend(fontsize=11)
+    ax1.axhline(y=0, color='k', linestyle='-', alpha=0.3, linewidth=0.8)
+    ax1.set_title(f'{track_name} - Vehicle Dynamics Summary', fontsize=16, fontweight='bold', pad=20)
+    
+    # Plot 2: Yaw Moment
+    ax2.plot(distance, yaw_moment, 'purple', linewidth=2, label='Yaw Moment', alpha=0.8)
+    ax2.set_ylabel('Yaw Moment [Nm]', fontsize=12, fontweight='bold')
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.legend(fontsize=11)
+    ax2.axhline(y=0, color='k', linestyle='-', alpha=0.3, linewidth=0.8)
+    
+    # Plot 3: Velocity
+    ax3.plot(distance, velocities, 'green', linewidth=2, label='Velocity', alpha=0.8)
+    ax3.set_ylabel('Velocity [mph]', fontsize=12, fontweight='bold')
+    ax3.set_xlabel('Distance Along Track [ft]', fontsize=12, fontweight='bold')
+    ax3.grid(True, alpha=0.3, linestyle='--')
+    ax3.legend(fontsize=11)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_path = get_plot_path('vehicle_dynamics_summary.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()

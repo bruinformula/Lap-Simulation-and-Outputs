@@ -18,6 +18,7 @@ detailed vehicle dynamics analysis that standard physics approaches miss.
 """
 
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
 from typing import Dict, Tuple, Optional
 
 
@@ -345,6 +346,104 @@ def calculate_individual_wheel_forces_simple(
                 wheel_forces[wheel][i] = min(wheel_forces[wheel][i], max_force)
     
     return wheel_forces
+
+
+def calculate_slip_angles_and_yaw_moment_arrays(
+    velocities: np.ndarray,
+    x_coords: np.ndarray,
+    y_coords: np.ndarray,
+    vehicle_config: Dict
+) -> Dict[str, np.ndarray]:
+    """
+    Calculate slip angles and yaw moment for arrays of position and velocity data.
+    
+    Parameters:
+    -----------
+    velocities : np.ndarray
+        Vehicle velocities [m/s or mph]
+    x_coords : np.ndarray
+        X coordinates along track [m or ft]
+    y_coords : np.ndarray
+        Y coordinates along track [m or ft]
+    vehicle_config : Dict
+        Vehicle configuration
+        
+    Returns:
+    --------
+    Dict[str, np.ndarray]
+        Arrays of slip angles and yaw moments
+    """
+    n_points = len(velocities)
+    
+    # Initialize output arrays
+    slip_angles_front = np.zeros(n_points)
+    slip_angles_rear = np.zeros(n_points)
+    yaw_moments = np.zeros(n_points)
+    curvatures = np.zeros(n_points)
+    
+    # Convert velocities to m/s if they're in mph
+    if np.mean(velocities) > 10:  # Assume mph if average > 10
+        velocities_ms = velocities * 0.44704
+    else:
+        velocities_ms = velocities
+    
+    # Calculate curvature at each point using central differences
+    for i in range(1, n_points - 1):
+        # Calculate curvature using three points
+        try:
+            # Vector from previous to current point
+            dx1 = x_coords[i] - x_coords[i-1]
+            dy1 = y_coords[i] - y_coords[i-1]
+            
+            # Vector from current to next point
+            dx2 = x_coords[i+1] - x_coords[i]
+            dy2 = y_coords[i+1] - y_coords[i]
+            
+            # Calculate curvature using cross product method
+            # k = |v1 x v2| / |v1|^3 where v1 is velocity vector
+            cross_product = dx1 * dy2 - dy1 * dx2
+            magnitude_squared = dx1**2 + dy1**2
+            
+            if magnitude_squared > 1e-6:
+                curvatures[i] = abs(cross_product) / (magnitude_squared**1.5)
+            else:
+                curvatures[i] = 0.0
+                
+        except:
+            curvatures[i] = 0.0
+    
+    # Handle boundary conditions
+    curvatures[0] = curvatures[1] if n_points > 1 else 0.0
+    curvatures[-1] = curvatures[-2] if n_points > 1 else 0.0
+    
+    # Smooth curvature to reduce noise
+    curvatures = gaussian_filter1d(curvatures, sigma=2.0)
+    
+    # Calculate slip angles and yaw moment for each point
+    for i in range(n_points):
+        try:
+            dynamics = calculate_slip_angles_and_yaw_moment(
+                velocity=velocities_ms[i],
+                curvature=curvatures[i],
+                vehicle_config=vehicle_config
+            )
+            
+            slip_angles_front[i] = dynamics['slip_angle_front']
+            slip_angles_rear[i] = dynamics['slip_angle_rear']
+            yaw_moments[i] = dynamics['yaw_moment']
+            
+        except:
+            # Handle any calculation errors with default values
+            slip_angles_front[i] = 0.0
+            slip_angles_rear[i] = 0.0
+            yaw_moments[i] = 0.0
+    
+    return {
+        'front': slip_angles_front,
+        'rear': slip_angles_rear,
+        'yaw_moment': yaw_moments,
+        'curvature': curvatures
+    }
 
 
 def validate_wheel_loads(wheel_loads: Dict[str, np.ndarray], vehicle_config: Dict) -> Dict:
