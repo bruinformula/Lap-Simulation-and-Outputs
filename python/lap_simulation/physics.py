@@ -608,57 +608,59 @@ def calculate_load_transfer(A_lat_g, A_long_g, velocities, vehicle_config):
     
     aero_forces = calculate_aerodynamic_forces(velocities, vehicle_params_for_aero)
     
-    # Static weight distribution (vehicle_config weight is in N, convert to lbs)
-    total_weight_lbs = vehicle_config['weight'] * 0.224809  # N to lbs
+    # Use metric units consistently - vehicle_config weight is already in N
+    total_weight_N = vehicle_config['weight']  # Already in N
     
     # Front and rear weight distribution based on CG position
-    wheelbase_ft = vehicle_config['wheelbase'] * 3.281  # m to ft
-    cg_x_ft = vehicle_config['cg_x'] * 3.281  # Convert m to ft
+    wheelbase_m = vehicle_config['wheelbase']  # Already in m
+    cg_x_m = vehicle_config['cg_x']  # Already in m
     
     # Weight distribution percentages
-    front_weight_percent = (wheelbase_ft - cg_x_ft) / wheelbase_ft
-    rear_weight_percent = cg_x_ft / wheelbase_ft
+    front_weight_percent = (wheelbase_m - cg_x_m) / wheelbase_m
+    rear_weight_percent = cg_x_m / wheelbase_m
     
-    # Static loads per axle
-    static_front_total = total_weight_lbs * front_weight_percent
-    static_rear_total = total_weight_lbs * rear_weight_percent
+    # Static loads per axle in N
+    static_front_total = total_weight_N * front_weight_percent
+    static_rear_total = total_weight_N * rear_weight_percent
     
-    # Track widths for lateral load transfer
-    track_width_front = vehicle_config.get('track_width_front', vehicle_config['track_width']) * 3.281  # m to ft
-    track_width_rear = vehicle_config.get('track_width_rear', vehicle_config['track_width']) * 3.281  # m to ft
+    # Track widths in m
+    track_width_front = vehicle_config.get('track_width_front', vehicle_config['track_width'])  # m
+    track_width_rear = vehicle_config.get('track_width_rear', vehicle_config['track_width'])  # m
     
     for i in range(N):
-        # Base static loads per wheel (quarter of total weight)
+        # Base static loads per wheel (half of total axle load)
         base_front_per_wheel = static_front_total / 2.0
         base_rear_per_wheel = static_rear_total / 2.0
         
-        # Add aerodynamic downforce
-        front_aero_per_wheel = aero_forces['front_downforce'][i] / 2.0
-        rear_aero_per_wheel = aero_forces['rear_downforce'][i] / 2.0
+        # Add aerodynamic downforce (convert from lbs to N)
+        front_aero_per_wheel = aero_forces['front_downforce'][i] * 4.44822 / 2.0  # lbs to N, then per wheel
+        rear_aero_per_wheel = aero_forces['rear_downforce'][i] * 4.44822 / 2.0  # lbs to N, then per wheel
         
         # Total normal loads including aerodynamics
         front_total_per_wheel = base_front_per_wheel + front_aero_per_wheel
         rear_total_per_wheel = base_rear_per_wheel + rear_aero_per_wheel
         
         # Lateral load transfer (based on lateral acceleration and CG height)
-        cg_height_ft = vehicle_config['cg_height']
-        lat_transfer_front = A_lat_g[i] * front_total_per_wheel * cg_height_ft / track_width_front
-        lat_transfer_rear = A_lat_g[i] * rear_total_per_wheel * cg_height_ft / track_width_rear
+        # Formula: ΔF = (a_y * m * h) / track_width, where a_y is in m/s²
+        cg_height_m = vehicle_config['cg_height']  # m
+        lat_transfer_front = A_lat_g[i] * 9.81 * (static_front_total / 9.81) * cg_height_m / track_width_front  # N
+        lat_transfer_rear = A_lat_g[i] * 9.81 * (static_rear_total / 9.81) * cg_height_m / track_width_rear  # N
         
         # Longitudinal load transfer (based on longitudinal acceleration and CG height)
-        long_transfer_total = A_long_g[i] * total_weight_lbs * cg_height_ft / wheelbase_ft
-        long_transfer_front = long_transfer_total * front_weight_percent
-        long_transfer_rear = long_transfer_total * rear_weight_percent
+        # Formula: ΔF = (a_x * m * h) / wheelbase, where a_x is in m/s²
+        long_transfer_total = A_long_g[i] * 9.81 * (total_weight_N / 9.81) * cg_height_m / wheelbase_m  # N
+        long_transfer_front = -long_transfer_total  # Negative because acceleration reduces front load
+        long_transfer_rear = long_transfer_total   # Positive because acceleration increases rear load
         
         # Additional longitudinal load transfer from aerodynamic pitch moment
         # The center of pressure position affects front/rear load distribution
         if 'downforce_pitch_moment' in aero_forces:
-            aero_pitch_moment = aero_forces['downforce_pitch_moment'][i]
+            aero_pitch_moment = aero_forces['downforce_pitch_moment'][i] * 1.35582  # Convert ft-lbs to N-m
             # Convert pitch moment to additional longitudinal load transfer
-            aero_long_transfer = aero_pitch_moment / wheelbase_ft
+            aero_long_transfer = aero_pitch_moment / wheelbase_m  # N
             # Distribute based on whether CoP is ahead or behind CG
-            cop_x_ft = vehicle_config['cop_longitudinal_position'] * 3.281
-            if cop_x_ft > cg_x_ft:  # CoP behind CG - increases rear load
+            cop_x_m = vehicle_config['cop_longitudinal_position']  # m
+            if cop_x_m > cg_x_m:  # CoP behind CG - increases rear load
                 long_transfer_front -= aero_long_transfer
                 long_transfer_rear += aero_long_transfer
             else:  # CoP ahead of CG - increases front load
@@ -901,23 +903,37 @@ def calculate_longitudinal_acceleration(velocity, distance, vehicle_config):
         ds_forward = distance[i+1] - distance[i]
         
         if ds_back > 0 and ds_forward > 0 and velocity[i] > 0:
-            # Time between points based on velocity
-            dt_back = ds_back / velocity[i]
-            dt_forward = ds_forward / velocity[i]
-            dt_total = dt_back + dt_forward
+            # Use kinematic equation a = v*dv/ds for more accuracy
+            dv_back = velocity[i] - velocity[i-1]
+            dv_forward = velocity[i+1] - velocity[i]
             
-            if dt_total > 1e-6:
-                # Central difference using actual time steps
-                acceleration[i] = (velocity[i+1] - velocity[i-1]) / dt_total / g  # Convert to g's
+            # Average acceleration over the segment
+            if ds_back > 0:
+                accel_back = velocity[i-1] * dv_back / ds_back / g
+            else:
+                accel_back = 0
                 
-                # Alternative: use kinematic equation a = v*dv/ds
-                dv = velocity[i+1] - velocity[i-1]
-                ds_avg = (ds_back + ds_forward) / 2
-                if ds_avg > 0:
-                    accel_kinematic = velocity[i] * dv / ds_avg / g
-                    # Use the more conservative (smaller magnitude) value
-                    if abs(accel_kinematic) < abs(acceleration[i]):
-                        acceleration[i] = accel_kinematic
+            if ds_forward > 0:
+                accel_forward = velocity[i] * dv_forward / ds_forward / g
+            else:
+                accel_forward = 0
+            
+            # Use average of forward and backward calculations
+            acceleration[i] = (accel_back + accel_forward) / 2
+    
+    # Handle edge cases for first and last points
+    if n_points > 1:
+        # First point: use forward difference
+        if distance[1] > distance[0] and velocity[0] > 0:
+            ds = distance[1] - distance[0]
+            dv = velocity[1] - velocity[0]
+            acceleration[0] = velocity[0] * dv / ds / g if ds > 0 else 0
+        
+        # Last point: use backward difference
+        if distance[-1] > distance[-2] and velocity[-2] > 0:
+            ds = distance[-1] - distance[-2]
+            dv = velocity[-1] - velocity[-2]
+            acceleration[-1] = velocity[-2] * dv / ds / g if ds > 0 else 0
     
     return acceleration
 
