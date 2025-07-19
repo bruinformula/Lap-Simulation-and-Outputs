@@ -39,7 +39,7 @@ filename = 'Hoosier_R25B_18.0x7.5-10_FX_12psi.mat';
 load(filename)
 
 tire_radius = 9.05/12; %ft
-tyreRadius = tire_radius/3.28; % converts to meters
+%tyreRadius = tire_radius/3.28; % converts to meters
 
 % finally, we have some scaling factors for longitudinal (x) and lateral
 % (y) friction. You can use these to tune the lap sim to correlate better 
@@ -62,8 +62,8 @@ shift_time = .25; % seconds
 T_lock = 90; % differential locking torque (0 =  open, 1 = locked)
 
 % Intermediary Calcs/Save your results into the workspace
-gearTot = gear(end)*finalDrive*primaryReduction;
-VMAX = floor(3.28*shiftpoint/(gearTot/tyreRadius*60/(2*pi)));
+%gearTot = gear(end)*finalDrive*primaryReduction;
+%VMAX = floor(3.28*shiftpoint/(gearTot/tyreRadius*60/(2*pi)));
 T_lock = T_lock/100;
 powertrainpackage = {engineSpeed engineTq primaryReduction gear finalDrive shiftpoint drivetrainLosses};
 
@@ -80,12 +80,12 @@ twr = 44/12; % rear track width (ft)
 % some intermediary calcs you don't have to touch
 LLTD = LLTD/100;
 WDF = WDF/100;
-m = W/32.2; % mass (lbm)
+%m = W/32.2; % mass (lbm)
 WF = W*WDF; % front weight
 WR = W*(1-WDF); % rear weight
-a = l*(1-WDF); % front axle to cg
-b = l*WDF; % rear axle to cg
-tw = twf;
+%a = l*(1-WDF); % front axle to cg
+%b = l*WDF; % rear axle to cg
+%tw = twf;
 %% Section 4: Input Suspension Kinematics
 disp('Loading Suspension Kinematics')
 % this section is actually optional. So if you set everything to zero, you
@@ -105,7 +105,7 @@ IA_compensationr = 20; % rear camber compensation (%), leave as default, not sur
 % lastly you can select your kingpin axis parameters
 casterf = 4; % front caster angle (deg)
 KPIf = 7.18; % front kingpin inclination angle (deg)
-casterr = 4;
+%casterr = 4;
 KPIr = 8.49;
 % intermediary calcs, plz ignore
 IA_staticf = deg2rad(IA_staticf); % front static camber angle (deg)
@@ -114,7 +114,7 @@ IA_compensationf = IA_compensationf/100; % front camber compensation (%)
 IA_compensationr = IA_compensationr/100; % rear camber compensation (%)
 casterf = deg2rad(casterf);
 KPIf = deg2rad(KPIf);
-casterr = deg2rad(casterr);
+%casterr = deg2rad(casterr);
 KPIr = deg2rad(KPIr);
 IA_roll_inducedf = asin(2/twf/12);
 IA_roll_inducedr = asin(2/twr/12);
@@ -138,7 +138,7 @@ CoP = CoP/100;
 disp('Generating g-g-V Diagram')
 
 deltar = 0;
-deltaf = 0;
+%deltaf = 0;
 
 % NOTE: I'm tampering here
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
@@ -188,7 +188,7 @@ for  i = 1:1:length(velocity) % for each velocity
     % find max force capacity from each tire:
     fxf(find(abs(fxf) > 1000)) = [];
     fxr(find(abs(fxr) > 1000)) = [];
-    FXF = max(fxf);
+    %FXF = max(fxf);
     FXR = max(fxr);
     % Calculate total tire tractive force (lbs)
     FX = abs(2*FXR);
@@ -206,7 +206,7 @@ for  i = 1:1:length(velocity) % for each velocity
         wr = wr+Ax*cg*WS/l/24;
         IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
         IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        FZ_vals = [-250:1:-50];
+        %FZ_vals = [-250:1:-50];
         sl = [0:.01:.11];
         for k = 1:length(sl)
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -214,7 +214,7 @@ for  i = 1:1:length(velocity) % for each velocity
         end
         fxf(find(abs(fxf) > 1000)) = [];
         fxr(find(abs(fxr) > 1000)) = [];
-        FXF = max(fxf);
+        %FXF = max(fxf);
         FXR = max(fxr);
         FX = abs(2*FXR);
         AX = FX/W;
@@ -403,7 +403,7 @@ for turn = 1:1:length(radii)
         ddelta = delta*.01;
         beta = deg2rad(0);
 
-        [AY, M_z, F_y, F_x, diff_AY, beta, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta);
+        [AY, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta);
 
         steer = rad2deg(delta);
         UG = rad2deg(delta-l/R)*32.2/AY;
@@ -438,7 +438,7 @@ for  i = 1:1:length(velocity)
     wr = wr-Ax*cg*WS/l/24;
     IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
     IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-    FZ_vals = [-250:1:-50];
+    %FZ_vals = [-250:1:-50];
     sl = [-.15:.01:0];
     for k = 1:length(sl)
         fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -462,7 +462,7 @@ for  i = 1:1:length(velocity)
         wr = wr-Ax*cg*WS/l/24;
         IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
         IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        FZ_vals = [-250:1:-50];
+        %FZ_vals = [-250:1:-50];
         sl = [-.15:.01:0];
         for k = 1:length(sl)
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
@@ -486,12 +486,12 @@ r_max = max(radii);
 spcount = spcount+1;
 shift_points(spcount) = V+1;
 top_speed = V;
-VMAX = top_speed;
+%VMAX = top_speed;
 
 % make the rest of your functions for the GGV diagram
 % braking as a function of speed
 deccel = csaps(velocity,A_X);
-velocity = 15:5:130;
+%velocity = 15:5:130;
 % lateral g's as a function of velocity
 lateral = csaps(velocity_y,lateralg);
 radii = velocity_y.^2./lateralg/32.2;
@@ -513,13 +513,13 @@ disp('Loading Endurance Track Coordinates')
 % sort the data into "inside" and "outside" cones
 outside = data(:,2:3);
 inside = data(:,4:5);
-t = [1:length(outside)];
+% t = [1:length(outside)];
 % define the minimum turn radius of the car
 r_min = 4.5*3.28;
 tw = 46/12;
 r_min = r_min-tw/2;
-pp_out = spline(t,outside');
-pp_in = spline(t,inside');
+%pp_out = spline(t,outside');
+%pp_in = spline(t,inside');
 
 for i = 1:1:length(outside)
     % isolate individual gates
@@ -534,7 +534,7 @@ for i = 1:1:length(outside)
     coeff = polyfit([x1, x2], [y1, y2], 1);
     % adjust the width of the gate for the width of the car:
     gate_width = sqrt((x2-x1)^2+(y2-y1)^2);
-    path_width = gate_width-tw;
+    % path_width = gate_width-tw;
     x_fs = tw/(2*gate_width);
     % update the gate boundaries based on said new width
     x_bound = [min(x1,x2)+x_fs*abs(x2-x1),max(x1,x2)-x_fs*abs(x2-x1)];
@@ -582,11 +582,11 @@ for i = 1:1:length(x)
     path_points(i,:) = [x3 y3];
 end
 
-x = linspace(1,t(end-1),1000);
-ppv = pchip(t,path_points');
-vehicle_path = ppval(ppv,x);
-vehicle_path_EN = vehicle_path;
-Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
+%x = linspace(1,t(end-1),1000);
+%ppv = pchip(t,path_points');
+%vehicle_path = ppval(ppv,x);
+%vehicle_path_EN = vehicle_path;
+% Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
 [acceleration, lateral_accel, distance] = lap_information(xx);
@@ -628,28 +628,28 @@ end
 
 % It is highly recommended to create another helper function for the
 % force/moment balancing loops to further simplify the main script.
-function [AY, M_z, F_y, F_x, diff_AY, beta, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta)
+function [AY, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta)
     % This helper function finds the balanced state (sideslip and steer)
     % for a given vehicle speed and turn radius.
 
     % Balance Lateral Force
-    [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-    while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
-    while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+    [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+    while diff_AY < 0; beta = beta + .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+    while diff_AY > 0; beta = beta - .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
 
     % Balance Yaw Moment
     while M_z < 0
         delta = delta + ddelta;
         beta = deg2rad(0);
-        [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-        while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
-        while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0; beta = beta + .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        while diff_AY > 0; beta = beta - .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
     end
     while M_z > 0
         delta = delta - ddelta;
         beta = deg2rad(0);
-        [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-        while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
-        while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0; beta = beta + .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        while diff_AY > 0; beta = beta - .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
     end
 end
