@@ -272,116 +272,21 @@ for turn = 1:1:length(radii)
         ddelta = delta*.01;
         % assume vehicle sideslip starts at 0 (rad)
         beta = deg2rad(0);
-        A_y = V^2/R;
-        % calculate lateral load transfer (lbs)
-        WT = A_y*cg*W/mean([twf twr])/32.2/12;
-        % split f/r using LLTD
-        WTF = WT*LLTD;
-        WTR = WT*(1-LLTD);
-        % calculate f/r roll (rad)
-        phif = A_y*rg_f*pi/180/32.2;
-        phir = A_y*rg_r*pi/180/32.2;
-        % update individual wheel loads 
-        wfin = wf-WTF;
-        wfout = wf+WTF;
-        wrin = wr-WTR;
-        wrout = wr+WTR;
-        % update individual wheel camber (from roll, then from steer
-        % effects)
-        IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-        IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-        IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-        IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir;
-        % calculate yaw rate
-        r = A_y/V;
-        % from yaw, sideslip and steer you can get slip angles
-        a_f = beta+a*r/V-delta;
-        a_r = beta-b*r/V;
-        % with slip angles, load and camber, calculate lateral force at
-        % the front
-        F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-        F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-        % before you calculate the rears, you ned to see what the diff is
-        % doing
-        % calculate the drag from aero and the front tires
-        F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-        % calculate the grip penalty assuming the rears must overcome that
-        % drag
-        rscale = 1-(F_x/W/fnval(grip,V))^2;
-        % now calculate rear tire forces, with said penalty
-        F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-        F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-        % sum of forces and moments
-        F_y = F_fin+F_fout+F_rin+F_rout;
-        M_z_diff = F_x*T_lock*twr/2; % incl the differential contribution     
-        M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-        % calculate resultant lateral acceleration
-        AY = F_y/(W/32.2);
-        % compare to the initial guess
-        diff_AY = A_y-AY;
+
+        [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+
         % vary the sideslip angle (B) until the initial guess and resultant
         % AY match up
         while diff_AY < 0
             beta = beta + .0025;
-            A_y = V^2/R;
-            WT = A_y*cg*W/mean([twf twr])/32.2/12;
-            WTF = WT*LLTD;
-            WTR = WT*(1-LLTD);
-            phif = A_y*rg_f*pi/180/32.2;
-            phir = A_y*rg_r*pi/180/32.2;
-            wfin = wf-WTF;
-            wfout = wf+WTF;
-            wrin = wr-WTR;
-            wrout = wr+WTR;
-            IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-            IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-            IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-            IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-            r = A_y/V;
-            a_f = beta+a*r/V-delta;
-            a_r = beta-b*r/V;
-            F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-            F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-            F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-            rscale = 1-(F_x/W/fnval(grip,V))^2;
-            F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-            F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-            F_y = F_fin+F_fout+F_rin+F_rout;
-            M_z_diff = F_x*T_lock*twr/2;       
-            M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-            AY = F_y/(W/32.2);
-            diff_AY = A_y-AY; 
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+
+
         end
         while diff_AY > 0
             beta = beta - .0025;
-            A_y = V^2/R;
-            WT = A_y*cg*W/mean([twf twr])/32.2/12;
-            WTF = WT*LLTD;
-            WTR = WT*(1-LLTD);
-            phif = A_y*rg_f*pi/180/32.2;
-            phir = A_y*rg_r*pi/180/32.2;
-            wfin = wf-WTF;
-            wfout = wf+WTF;
-            wrin = wr-WTR;
-            wrout = wr+WTR;
-            IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-            IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-            IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-            IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-            r = A_y/V;
-            a_f = beta+a*r/V-delta;
-            a_r = beta-b*r/V;
-            F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-            F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-            F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-            rscale = 1-(F_x/W/fnval(grip,V))^2;
-            F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-            F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-            F_y = F_fin+F_fout+F_rin+F_rout;
-            M_z_diff = F_x*T_lock*twr/2;          
-            M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-            AY = F_y/(W/32.2);
-            diff_AY = A_y-AY; 
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+
         end
         % at that point, check the yaw moment. Re-run the above loop^ but
         % this time, steer angle is being varied until moment comes out to
@@ -389,194 +294,37 @@ for turn = 1:1:length(radii)
         while M_z < 0 
             delta = delta+ddelta;
             beta = deg2rad(0);
-            A_y = V^2/R;
-            WT = A_y*cg*W/mean([twf twr])/32.2/12;
-            WTF = WT*LLTD;
-            WTR = WT*(1-LLTD);
-            phif = A_y*rg_f*pi/180/32.2;
-            phir = A_y*rg_r*pi/180/32.2;
-            wfin = wf-WTF;
-            wfout = wf+WTF;
-            wrin = wr-WTR;
-            wrout = wr+WTR;
-            IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-            IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-            IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-            IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-            r = A_y/V;
-            a_f = beta+a*r/V-delta;
-            a_r = beta-b*r/V;
-            F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-            F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-            F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-            rscale = 1-(F_x/W/fnval(grip,V))^2;
-            F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-            F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-            F_y = F_fin+F_fout+F_rin+F_rout;
-            M_z_diff = F_x*T_lock*twr/2;      
-            M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-            AY = F_y/(W/32.2);
-            diff_AY = A_y-AY;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             while diff_AY < 0
                 beta = beta + .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
             end
             while diff_AY > 0
                 beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             end
         end
         while M_z > 0 
             delta = delta-ddelta;
             beta = deg2rad(0);
-            A_y = V^2/R;
-            WT = A_y*cg*W/mean([twf twr])/32.2/12;
-            WTF = WT*LLTD;
-            WTR = WT*(1-LLTD);
-            phif = A_y*rg_f*pi/180/32.2;
-            phir = A_y*rg_r*pi/180/32.2;
-            wfin = wf-WTF;
-            wfout = wf+WTF;
-            wrin = wr-WTR;
-            wrout = wr+WTR;
-            IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-            IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-            IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-            IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-            r = A_y/V;
-            a_f = beta+a*r/V-delta;
-            a_r = beta-b*r/V;
-            F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-            F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-            F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-            rscale = 1-(F_x/W/fnval(grip,V))^2;
-            F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-            F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-            F_y = F_fin+F_fout+F_rin+F_rout;
-            M_z_diff = F_x*T_lock*twr/2; 
-            M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-            AY = F_y/(W/32.2);
-            diff_AY = A_y-AY;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             while diff_AY < 0
                 beta = beta + .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             end
             while diff_AY > 0
                 beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             end
         end
         % then re run all of THAT, slowly increasing your AY guess 
         % until the front tire maxes out aka slip
         % angle of 12
+
+        A_y = V^2/R;
+        r = A_y/V;
+        a_f = beta + a*r/V - delta;
+
         while a_f > deg2rad(-12)
             AYP = AYP+.005;
             a = l*(1-WDF);
@@ -593,284 +341,41 @@ for turn = 1:1:length(radii)
             delta = l/R;
             ddelta = delta*.005;
             beta = deg2rad(0);
-            A_y = V^2/R;
-            WT = A_y*cg*W/mean([twf twr])/32.2/12;
-            WTF = WT*LLTD;
-            WTR = WT*(1-LLTD);
-            phif = A_y*rg_f*pi/180/32.2;
-            phir = A_y*rg_r*pi/180/32.2;
-            wfin = wf-WTF;
-            wfout = wf+WTF;
-            wrin = wr-WTR;
-            wrout = wr+WTR;
-            IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-            IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-            IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-            IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-            r = A_y/V;
-            a_f = beta+a*r/V-delta;
-            a_r = beta-b*r/V;
-            F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-            F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-            F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-            rscale = 1-(F_x/W/fnval(grip,V))^2;
-            F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-            F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-            F_y = F_fin+F_fout+F_rin+F_rout;
-            M_z_diff = F_x*T_lock*twr/2; 
-            M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-            AY = F_y/(W/32.2);
-            diff_AY = A_y-AY;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             while diff_AY < 0
                 beta = beta + .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
             end
             while diff_AY > 0
                 beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
             end
             %rad2deg([a_f a_r])
             while M_z > 0 
                 delta = delta-ddelta;
                 beta = deg2rad(0);
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY;
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
                 while diff_AY < 0
                     beta = beta + .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
+                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
                 end
                 while diff_AY > 0
                     beta = beta - .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
+                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
                 end
             end
             while M_z < 0 
                 delta = delta+ddelta;
                 beta = deg2rad(0);
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY;
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
                 while diff_AY < 0
                     beta = beta + .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
+                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
                 end
                 while diff_AY > 0
                     beta = beta - .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    %disp(rad2deg(a_f))
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
+                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
+                    a_f = beta+a*r/V-delta; 
                     if a_f < deg2rad(-12)
                         diff_AY = -1;
                     end
@@ -897,297 +402,14 @@ for turn = 1:1:length(radii)
         delta = l/R;
         ddelta = delta*.01;
         beta = deg2rad(0);
-        A_y = V^2/R;
-        WT = A_y*cg*W/mean([twf twr])/32.2/12;
-        WTF = WT*LLTD;
-        WTR = WT*(1-LLTD);
-        phif = A_y*rg_f*pi/180/32.2;
-        phir = A_y*rg_r*pi/180/32.2;
-        wfin = wf-WTF;
-        wfout = wf+WTF;
-        wrin = wr-WTR;
-        wrout = wr+WTR;
-        IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-        IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-        IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-        IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-        r = A_y/V;
-        a_f = beta+a*r/V-delta;
-        a_r = beta-b*r/V;
-        F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-        F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-        F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-        rscale = 1-(F_x/W/fnval(grip,V))^2;
-        F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-        F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-        F_y = F_fin+F_fout+F_rin+F_rout;
-        M_z_diff = F_x*T_lock*twr/2; 
-        M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-        AY = F_y/(W/32.2);
-        diff_AY = A_y-AY;
-        while diff_AY < 0
-                beta = beta + .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
-            end
-        while diff_AY > 0
-                beta = beta - .0025;
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY; 
-            end
-        %rad2deg([a_f a_r])
-        while M_z < 0 
-                delta = delta+ddelta;
-                beta = deg2rad(0);
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY;
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
-                end
-                while diff_AY > 0
-                    beta = beta - .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2;     
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
-                    if a_f < deg2rad(-12)
-                        diff_AY = -1;
-                    end
-                end
-            end
-        while M_z > 0 
-                delta = delta-ddelta;
-                beta = deg2rad(0);
-                A_y = V^2/R;
-                WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                WTF = WT*LLTD;
-                WTR = WT*(1-LLTD);
-                phif = A_y*rg_f*pi/180/32.2;
-                phir = A_y*rg_r*pi/180/32.2;
-                wfin = wf-WTF;
-                wfout = wf+WTF;
-                wrin = wr-WTR;
-                wrout = wr+WTR;
-                IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                r = A_y/V;
-                a_f = beta+a*r/V-delta;
-                a_r = beta-b*r/V;        
-                F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                rscale = 1-(F_x/W/fnval(grip,V))^2;
-                F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                F_y = F_fin+F_fout+F_rin+F_rout;
-                M_z_diff = F_x*T_lock*twr/2; 
-                M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                AY = F_y/(W/32.2);
-                diff_AY = A_y-AY;
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
-                end
-                while diff_AY > 0
-                    beta = beta - .0025;
-                    A_y = V^2/R;
-                    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-                    WTF = WT*LLTD;
-                    WTR = WT*(1-LLTD);
-                    phif = A_y*rg_f*pi/180/32.2;
-                    phir = A_y*rg_r*pi/180/32.2;
-                    wfin = wf-WTF;
-                    wfout = wf+WTF;
-                    wrin = wr-WTR;
-                    wrout = wr+WTR;
-                    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-                    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-                    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-                    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir; 
-                    r = A_y/V;
-                    a_f = beta+a*r/V-delta;
-                    a_r = beta-b*r/V;
-                    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
-                    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
-                    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta); 
-                    rscale = 1-(F_x/W/fnval(grip,V))^2;
-                    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
-                    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
-                    F_y = F_fin+F_fout+F_rin+F_rout;
-                    M_z_diff = F_x*T_lock*twr/2; 
-                    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
-                    AY = F_y/(W/32.2);
-                    diff_AY = A_y-AY; 
-                end
-        end
-        B = rad2deg(beta);
-        af = rad2deg(a_f);
-        ar = rad2deg(a_r);
+
+        [AY, M_z, F_y, F_x, diff_AY, beta, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta);
+
         steer = rad2deg(delta);
         UG = rad2deg(delta-l/R)*32.2/AY;
         Ugradient(turn) = UG;
         %F_lat = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*cos(delta);
         %F_drag = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*sin(delta);
-        skid = 2*pi*R/V;
         steering(turn) = steer;
         speed(turn) = V;
         lateralg(turn) = AY/32.2;
@@ -1368,3 +590,66 @@ Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
 [acceleration, lateral_accel, distance] = lap_information(xx);
+
+end
+
+function [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip)
+
+    A_y = V^2/R;
+    WT = A_y*cg*W/mean([twf twr])/32.2/12;
+    WTF = WT*LLTD;
+    WTR = WT*(1-LLTD);
+    phif = A_y*rg_f*pi/180/32.2;
+    phir = A_y*rg_r*pi/180/32.2;
+    wfin = wf-WTF;
+    wfout = wf+WTF;
+    wrin = wr-WTR;
+    wrout = wr+WTR;
+    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
+    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
+    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
+    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir;
+    r = A_y/V;
+    a_f = beta+a*r/V-delta;
+    a_r = beta-b*r/V;
+    F_fin = -MF52_Fy_fcn(A,[-rad2deg(a_f) wfin -rad2deg(IA_f_in)])*sf_y*cos(delta);
+    F_fout = MF52_Fy_fcn(A,[rad2deg(a_f) wfout -rad2deg(IA_f_out)])*sf_y*cos(delta);
+    F_x = Cd*V^2 + (F_fin+F_fout)*sin(delta)/cos(delta);
+    rscale = 1-(F_x/W/fnval(grip,V))^2;
+    F_rin = -MF52_Fy_fcn(A,[-rad2deg(a_r) wrin -rad2deg(IA_r_in)])*sf_y*rscale;
+    F_rout = MF52_Fy_fcn(A,[rad2deg(a_r) wrout -rad2deg(IA_r_out)])*sf_y*rscale;
+    F_y = F_fin+F_fout+F_rin+F_rout;
+    M_z_diff = F_x*T_lock*twr/2;
+    M_z = (F_fin+F_fout)*a-(F_rin+F_rout)*b-M_z_diff;
+    AY = F_y/(W/32.2);
+    diff_AY = A_y-AY;
+
+end
+
+% It is highly recommended to create another helper function for the
+% force/moment balancing loops to further simplify the main script.
+function [AY, M_z, F_y, F_x, diff_AY, beta, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta)
+    % This helper function finds the balanced state (sideslip and steer)
+    % for a given vehicle speed and turn radius.
+
+    % Balance Lateral Force
+    [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+    while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+    while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+
+    % Balance Yaw Moment
+    while M_z < 0
+        delta = delta + ddelta;
+        beta = deg2rad(0);
+        [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+    end
+    while M_z > 0
+        delta = delta - ddelta;
+        beta = deg2rad(0);
+        [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0; beta = beta + .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+        while diff_AY > 0; beta = beta - .0025; [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
+    end
+end

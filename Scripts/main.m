@@ -25,7 +25,7 @@ figure('Name','Accelerations','NumberTitle','off');
 % xlabel('Sample #');
 % ylabel('Acceleration (G)');
 
-plot(distance,acceleration,distance,lateral_accel)
+plot(distance,A_long_g,distance,A_lat_g)
 title('Endurance Simulation Acceleration Traces')
 xlabel('Distance Travelled (d) [ft]')
 ylabel('Acceleration [g]')
