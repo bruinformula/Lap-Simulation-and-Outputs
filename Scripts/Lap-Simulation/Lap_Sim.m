@@ -11,13 +11,22 @@ addpath("Data Files")
 % The purpose of this code is to evaluate the points-scoring capacity of a
 % virtual vehicle around the 2019 FSAE Michigan Dynamic Event Tracks
 
+
+
+
+
 %% Section 0: Name all symbolic variables
 % Don't touch this. This is just naming a bunch of variables and making
 % them global so that all the other functions can access them
 global r_max accel grip deccel lateral cornering gear shift_points...
     top_speed r_min path_boundaries tire_radius shift_time...
     powertrainpackage
-%% Section 1: Input Tire Model
+
+
+
+
+
+    %% Section 1: Input Tire Model
 % this section is required, everything should be pre-loaded so no need to
 % touch any of this, unless you want to change the tire being evaluated.
 % The only things you might want to change are the scaling factors at the
@@ -46,6 +55,11 @@ tire_radius = 9.05/12; %ft
 % to logged data 
 sf_x = .6;
 sf_y = .47;   
+
+
+
+
+
 %% Section 2: Input Powertrain Model
 % change whatever you want here, this is the 2018 powertrain package iirc
 % just keep your units consistent please
@@ -67,6 +81,10 @@ T_lock = 90; % differential locking torque (0 =  open, 1 = locked)
 T_lock = T_lock/100;
 powertrainpackage = {engineSpeed engineTq primaryReduction gear finalDrive shiftpoint drivetrainLosses};
 
+
+
+
+
 %% Section 3: Vehicle Architecture
 disp('Loading Vehicle Characteristics')
 % These are the basic vehicle architecture primary inputs:
@@ -86,6 +104,12 @@ WR = W*(1-WDF); % rear weight
 %a = l*(1-WDF); % front axle to cg
 %b = l*WDF; % rear axle to cg
 %tw = twf;
+
+
+
+
+
+
 %% Section 4: Input Suspension Kinematics
 disp('Loading Suspension Kinematics')
 % this section is actually optional. So if you set everything to zero, you
@@ -122,6 +146,9 @@ IA_gainf = IA_roll_inducedf*IA_compensationf;
 IA_gainr = IA_roll_inducedr*IA_compensationr;
 
 
+
+
+
 %% Section 5: Input Aero Parameters
 disp('Loading Aero Model')
 Cl = .0418; %279/418
@@ -130,6 +157,11 @@ CoP = 48; % front downforce distribution (%)
 
 % Intermediary Calculations
 CoP = CoP/100;
+
+
+
+
+
 %% Section 6: Generate GGV Diagram
 % this is where the m e a t of the lap sim takes place. The GGV diagram is
 % built by finding a maximum cornering, braking, and acceleration capacity
@@ -142,107 +174,48 @@ deltar = 0;
 
 % NOTE: I'm tampering here
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
-velocity = 15:5:30; % range of velocities at which sim will evaluate (ft/s)
+velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
 % radii = [15:10:155]; % range of turn radii at which sim will evaluate (ft)
-radii = 15:10:105;
-% radii = :10:155; % range of turn radii at which sim will evaluate (ft)
+radii = 15:10:155;
+% radii = 15:10:155; % range of turn radii at which sim will evaluate (ft)
 
 % First we will evaluate our Acceleration Capacity
-g = 1; % g is a gear indicator, and it will start at 1
-spcount = 1; % spcount is keeping track of how many gearshifts there are
-% shift_points tracks the actual shift point velocities
 shift_points(1) = 0; 
 disp('     Acceleration Envelope')
-for  i = 1:1:length(velocity) % for each velocity
-    gp = g; % Current gear = current gear (wow!)
-    V = velocity(i); % find velocity
-    DF = Cl*V^2; % calculate downforce (lbs)
-    % calculate f/r suspension drop from downforce (in)
-    dxf = DF*CoP/2/WRF; 
-    dxr = DF*(1-CoP)/2/WRR;
-    % from rh drop, find camber gain (deg)
-    IA_0f = IA_staticf - dxf*IA_gainf;
-    IA_0r = IA_staticr - dxr*IA_gainr;
-    % find load on each tire (lbs)
-    wf = (WF+DF*CoP)/2;
-    wr = (WR+DF*(1-CoP))/2;
+shift_points(1) = 0;
+g = 1;
+spcount = 1;
+% Preallocate arrays for speed
+A_xr = zeros(1, length(velocity));
+A_Xr = zeros(1, length(velocity));
+gear_out = zeros(1, length(velocity));
+
+for i = 1:length(velocity)
+    V = velocity(i);
+    gp = g;
     
-    % now we actually sweep through with acceleration
-    Ax = 0; % starting guess of zero g's
-    WS = W/2; % weight of one half-car
-    pitch = -Ax*pg*pi/180; % pitch angle (rad)
-    % recalculate wheel loads due to load transfer (lbs)
-    wf = wf-Ax*cg*WS/l; 
-    wr = wr+Ax*cg*WS/l;
-    % recalculate camber angles due to pitch
-    IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;
-    IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;
-    % select a range of slip ratios (sl) [-]
-    sl = [0:.01:.11];
-    % evaluate the tractive force capacity from each tire for the range of
-    % slip ratios
-    for k = 1:length(sl)  
-        fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
-        fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
-    end
-    % find max force capacity from each tire:
-    fxf(abs(fxf) > 1000) = [];
-    fxr(abs(fxr) > 1000) = [];
-    %FXF = max(fxf);
-    FXR = max(fxr);
-    % Calculate total tire tractive force (lbs)
-    FX = abs(2*FXR);
-    % calculate total lateral acceleration capacity (g's)
-    AX = FX/W;
-    AX_diff = AX-Ax;
-    while AX_diff>0
-        %disp([Ax AX])
-        Ax = Ax+.01;
-        WS = W/2;
-        pitch = -Ax*pg*pi/180;
-        wf = (WF+DF*CoP)/2;
-        wr = (WR+DF*(1-CoP))/2;
-        wf = wf-Ax*cg*WS/l/24;
-        wr = wr+Ax*cg*WS/l/24;
-        IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
-        IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        %FZ_vals = [-250:1:-50];
-        sl = [0:.01:.11];
-        for k = 1:length(sl)
-            fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
-            fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
-        end
-        fxf(abs(fxf) > 1000) = [];
-        fxr(abs(fxr) > 1000) = [];
-        %FXF = max(fxf);
-        FXR = max(fxr);
-        FX = abs(2*FXR);
-        AX = FX/W;
-        AX_diff = AX-Ax;
-    end
-    A_xr(i) = AX;
-    output = Powertrainlapsim(max(7.5,V/3.28)); % 7.5 reg, 10 launch
-    FX = output(1)*.2248;
-    FX = FX-Cd*V^2;
-    fx(i) = FX/W;
-    AX(i) = min(FX/W,A_xr(i));
+    % Call helper function to get tire-limited grip
+    A_xr(i) = calculateLongitudinalGrip(V, 'acceleration', W, cg, l, pg, Cl, CoP, WRF, WRR, WF, WR, IA_staticf, IA_staticr, IA_gainf, IA_gainr, sf_x, full_send_x);
+    
+    % Calculate power-limited acceleration
+    output = Powertrainlapsim(max(7.5, V/3.28));
+    FX = output(1)*.2248 - Cd*V^2;
+    
+    % Final acceleration is the minimum of tire grip or engine power
+    A_Xr(i) = min(FX/W, A_xr(i));
+    
+    % Determine current gear and check for shifts
     output = Powertrainlapsim(V/3.28);
     g = output(2);
-    gear(i) = g;
-    if g>gp
-        spcount = spcount+1;
+    gear_out(i) = g;
+    if g > gp
+        spcount = spcount + 1;
         shift_points(spcount) = V;
     end
-    A_Xr(i) = AX(i);
 end
 A_Xr(A_Xr < 0) = 0;
-
-% from these results, you can create the first part of the GGV diagram
-% input for the lap sim codes:
-% accel is the maximum acceleration capacity as a function of velocity
-% (power limited) and grip is the same but (tire limited)
-accel = csaps(velocity,A_Xr);
-grip = csaps(velocity,A_xr);
+accel = csaps(velocity, A_Xr);
+grip = csaps(velocity, A_xr);
 
 % Next we explore the cornering envelope. First we define AYP, which is the
 % starting guess for lateral acceleration capacity at a given speed
@@ -280,13 +253,10 @@ for turn = 1:1:length(radii)
     while diff_AY < 0
         beta = beta + .0025;
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-
-
     end
     while diff_AY > 0
         beta = beta - .0025;
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-
     end
     % at that point, check the yaw moment. Re-run the above loop^ but
     % this time, steer angle is being varied until moment comes out to
@@ -417,69 +387,17 @@ for turn = 1:1:length(radii)
 end
 % Lateral Acceleration
 
+
 % Braking Performance
 velocity = 15:5:130;
-A_X = zeros(1, length(velocity)); 
 
 disp('     Braking Envelope')
-% the braking sim works exactly the same as acceleration, except now all 4
-% tires are contributing to the total braking capacity
-for  i = 1:1:length(velocity)
-    V = velocity(i);
-    DF = Cl*V^2;
-    dxf = DF*CoP/2/WRF;
-    dxr = DF*(1-CoP)/2/WRR;
-    IA_0f = IA_staticf - dxf*IA_gainf;
-    IA_0r = IA_staticr - dxr*IA_gainr;
-    wf = (WF+DF*CoP)/2;
-    wr = (WR+DF*(1-CoP))/2;
-    Ax = 1;
-    WS = W/2;
-    pitch = Ax*pg*pi/180;
-    wf = wf+Ax*cg*WS/l/24;
-    wr = wr-Ax*cg*WS/l/24;
-    IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
-    IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-    %FZ_vals = [-250:1:-50];
-    sl = [-.15:.01:0];
-    for k = 1:length(sl)
-        fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
-        fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
-    end
-    fxf(abs(fxf) > 1000) = [];
-    fxr(abs(fxr) > 1000) = [];
-    FXF = min(fxf);
-    FXR = min(fxr);
-    FX = abs(2*FXF+2*FXR);
-    AX = FX/W;
-    AX_diff = AX-Ax;
-    while AX_diff>0
-        %disp([Ax AX])
-        Ax = Ax+.01;
-        WS = W/2;
-        pitch = Ax*pg*pi/180;
-        wf = (WF+DF*CoP)/2;
-        wr = (WR+DF*(1-CoP))/2;
-        wf = wf+Ax*cg*WS/l/24;
-        wr = wr-Ax*cg*WS/l/24;
-        IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;% - KPIf*(1-cos(deltaf)) + casterf*sin(deltaf);
-        IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;% - KPIr*(1-cos(deltar)) + casterf*sin(deltar);
-        %FZ_vals = [-250:1:-50];
-        sl = [-.15:.01:0];
-        for k = 1:length(sl)
-            fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
-            fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
-        end
-        fxf(abs(fxf) > 1000) = [];
-        fxr(abs(fxr) > 1000) = [];
-        FXF = min(fxf);
-        FXR = min(fxr);
-        FX = abs(2*FXF+2*FXR);
-        AX = FX/W;
-        AX_diff = AX-Ax;
-    end
-    A_X(i) = AX;
+A_X = zeros(1, length(velocity));
+for i = 1:length(velocity)
+    % Call the same helper function, but in 'braking' mode
+    A_X(i) = calculateLongitudinalGrip(velocity(i), 'braking', W, cg, l, pg, Cl, CoP, WRF, WRR, WF, WR, IA_staticf, IA_staticr, IA_gainf, IA_gainr, sf_x, full_send_x);
 end
+deccel = csaps(velocity, A_X);
 
 velocity_y = lateralg.*32.2.*radii;
 velocity_y = sqrt(velocity_y);
@@ -499,6 +417,11 @@ lateral = csaps(velocity_y,lateralg);
 radii = velocity_y.^2./lateralg/32.2;
 % max velocity as a function of instantaneous turn radius
 cornering = csaps(radii,velocity_y);
+
+
+
+
+
 %% Section 7: Load Endurance Track Coordinates
 disp('Loading Endurance Track Coordinates')
 [data, ~] = xlsread(lap_coords,'Scaled');
@@ -542,10 +465,20 @@ for i = 1:1:length(outside)
     x_bound = [min(x1,x2)+x_fs*abs(x2-x1),max(x1,x2)-x_fs*abs(x2-x1)];
     path_boundaries(i,:) = [coeff x_bound];
 end
+
+
+
+
+
 %% Seciton 8: Load Endurance Racing Line
 disp('Loading Endurance Racing Line')
 xx = load('endurance_racing_line.mat');
 xx = xx.endurance_racing_line;
+
+
+
+
+
 %% Section 9: Optimize Endurance Racing Line
 % The pre-loaded racing line should work for most applications; however,
 % if you have the need to re-evaluate or generate a new optimized racing
@@ -565,6 +498,11 @@ xx = xx.endurance_racing_line;
 %  xx = x;
 %  x(end+1) = x(1);
 % x(end+1) = x(2);
+
+
+
+
+
 %% Section 10: Generate Final Endurance Trajectory
 x = xx;
 
@@ -593,6 +531,11 @@ end
 %vehicle_path = ppval(ppv,x);
 %vehicle_path_EN = vehicle_path;
 % Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
+
+
+
+
+
 %% Section 11: Simulate Endurance Lap
 disp('Plotting Vehicle Trajectory')
 [acceleration, lateral_accel, distance] = lap_information(xx);
@@ -659,4 +602,61 @@ function [AY, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_
         while diff_AY < 0; beta = beta + .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
         while diff_AY > 0; beta = beta - .0025; [AY, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); end
     end
+end
+
+function max_g = calculateLongitudinalGrip(V, mode, W, cg, l, pg, Cl, CoP, WRF, WRR, WF, WR, IA_staticf, IA_staticr, IA_gainf, IA_gainr, sf_x, full_send_x)
+% calculateLongitudinalGrip: Finds the maximum tire-limited longitudinal g-force.
+    
+    DF = Cl*V^2;
+    dxf = DF*CoP/2/WRF;
+    dxr = DF*(1-CoP)/2/WRR;
+    IA_0f = IA_staticf - dxf*IA_gainf;
+    IA_0r = IA_staticr - dxr*IA_gainr;
+    
+    wf_static = (WF+DF*CoP)/2;
+    wr_static = (WR+DF*(1-CoP))/2;
+
+    Ax = 0; 
+    AX_diff = 1;
+
+    while AX_diff > 0
+        if strcmp(mode, 'acceleration')
+            pitch = -Ax*pg*pi/180;
+            wf = wf_static - Ax*cg*W/l/2;
+            wr = wr_static + Ax*cg*W/l/2;
+            sl = 0:0.01:0.11;
+        else % braking
+            pitch = Ax*pg*pi/180;
+            wf = wf_static + Ax*cg*W/l/2;
+            wr = wr_static - Ax*cg*W/l/2;
+            sl = -0.15:0.01:0;
+        end
+        
+        IA_f = -l*12*sin(pitch)/2*IA_gainf + IA_0f;
+        IA_r = l*12*sin(pitch)/2*IA_gainr + IA_0r;
+
+        fxf = fnval([sl; -wf*ones(size(sl)); rad2deg(-IA_f)*ones(size(sl))], full_send_x) * sf_x;
+        fxr = fnval([sl; -wr*ones(size(sl)); rad2deg(-IA_r)*ones(size(sl))], full_send_x) * sf_x;
+        
+        fxf(abs(fxf) > 1000) = [];
+        fxr(abs(fxr) > 1000) = [];
+
+        if strcmp(mode, 'acceleration')
+            FXR = max(fxr);
+            FX = abs(2*FXR);
+        else % braking
+            FXF = min(fxf);
+            FXR = min(fxr);
+            FX = abs(2*FXF + 2*FXR);
+        end
+        
+        AX = FX/W;
+        AX_diff = AX - Ax;
+        
+        if AX_diff <= 0
+            break; % Exit if we've found the peak
+        end
+        Ax = Ax + 0.01;
+    end
+    max_g = AX;
 end
