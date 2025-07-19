@@ -186,8 +186,8 @@ for  i = 1:1:length(velocity) % for each velocity
         fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
     end
     % find max force capacity from each tire:
-    fxf(find(abs(fxf) > 1000)) = [];
-    fxr(find(abs(fxr) > 1000)) = [];
+    fxf(abs(fxf) > 1000) = [];
+    fxr(abs(fxr) > 1000) = [];
     %FXF = max(fxf);
     FXR = max(fxr);
     % Calculate total tire tractive force (lbs)
@@ -212,8 +212,8 @@ for  i = 1:1:length(velocity) % for each velocity
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
             fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
         end
-        fxf(find(abs(fxf) > 1000)) = [];
-        fxr(find(abs(fxr) > 1000)) = [];
+        fxf(abs(fxf) > 1000) = [];
+        fxr(abs(fxr) > 1000) = [];
         %FXF = max(fxf);
         FXR = max(fxr);
         FX = abs(2*FXR);
@@ -252,45 +252,118 @@ disp('     Cornering Envelope')
 % cornering radii, instead of speeds
 for turn = 1:1:length(radii)
     % first define your vehicle characteristics:
-        a = l*(1-WDF);
-        b = l*WDF;
-        R = radii(turn);
-        % update speed and downforce
-        V = sqrt(R*32.2*AYP);
-        DF = Cl*V^2; 
-        % from downforce, update suspension travel (in):
-        dxf = DF*CoP/2/WRF; 
-        dxr = DF*(1-CoP)/2/WRR; 
-        % from suspension heave, update static camber (rad):
-        IA_0f = IA_staticf - dxf*IA_gainf; 
-        IA_0r = IA_staticr - dxr*IA_gainr; 
-        % update load on each axle (lbs)
-        wf = (WF+DF*CoP)/2;
-        wr = (WR+DF*(1-CoP))/2;
-        % guess ackermann steer angle as starting steer angle
-        delta = l/R;
-        ddelta = delta*.01;
-        % assume vehicle sideslip starts at 0 (rad)
-        beta = deg2rad(0);
+    a = l*(1-WDF);
+    b = l*WDF;
+    R = radii(turn);
+    % update speed and downforce
+    V = sqrt(R*32.2*AYP);
+    DF = Cl*V^2; 
+    % from downforce, update suspension travel (in):
+    dxf = DF*CoP/2/WRF; 
+    dxr = DF*(1-CoP)/2/WRR; 
+    % from suspension heave, update static camber (rad):
+    IA_0f = IA_staticf - dxf*IA_gainf; 
+    IA_0r = IA_staticr - dxr*IA_gainr; 
+    % update load on each axle (lbs)
+    wf = (WF+DF*CoP)/2;
+    wr = (WR+DF*(1-CoP))/2;
+    % guess ackermann steer angle as starting steer angle
+    delta = l/R;
+    ddelta = delta*.01;
+    % assume vehicle sideslip starts at 0 (rad)
+    beta = deg2rad(0);
 
+    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+
+    % vary the sideslip angle (B) until the initial guess and resultant
+    % AY match up
+    while diff_AY < 0
+        beta = beta + .0025;
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
 
-        % vary the sideslip angle (B) until the initial guess and resultant
-        % AY match up
+
+    end
+    while diff_AY > 0
+        beta = beta - .0025;
+        [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+
+    end
+    % at that point, check the yaw moment. Re-run the above loop^ but
+    % this time, steer angle is being varied until moment comes out to
+    % zero-ish:
+    while M_z < 0 
+        delta = delta+ddelta;
+        beta = deg2rad(0);
+        [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
         while diff_AY < 0
             beta = beta + .0025;
-            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-
-
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
         end
         while diff_AY > 0
             beta = beta - .0025;
             [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-
         end
-        % at that point, check the yaw moment. Re-run the above loop^ but
-        % this time, steer angle is being varied until moment comes out to
-        % zero-ish:
+    end
+    while M_z > 0 
+        delta = delta-ddelta;
+        beta = deg2rad(0);
+        [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0
+            beta = beta + .0025;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        end
+        while diff_AY > 0
+            beta = beta - .0025;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        end
+    end
+    % then re run all of THAT, slowly increasing your AY guess 
+    % until the front tire maxes out aka slip
+    % angle of 12
+
+    A_y = V^2/R;
+    r = A_y/V;
+    a_f = beta + a*r/V - delta;
+
+    while a_f > deg2rad(-12)
+        AYP = AYP+.005;
+        a = l*(1-WDF);
+        b = l*WDF;
+        R = radii(turn);
+        V = sqrt(R*32.2*AYP);
+        DF = Cl*V^2; 
+        dxf = DF*CoP/2/WRF; 
+        dxr = DF*(1-CoP)/2/WRR; 
+        IA_0f = IA_staticf - dxf*IA_gainf; 
+        IA_0r = IA_staticr - dxr*IA_gainr; 
+        wf = (WF+DF*CoP)/2;
+        wr = (WR+DF*(1-CoP))/2;
+        delta = l/R;
+        ddelta = delta*.005;
+        beta = deg2rad(0);
+        [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        while diff_AY < 0
+            beta = beta + .0025;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+        end
+        while diff_AY > 0
+            beta = beta - .0025;
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
+        end
+        %rad2deg([a_f a_r])
+        while M_z > 0 
+            delta = delta-ddelta;
+            beta = deg2rad(0);
+            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
+            while diff_AY < 0
+                beta = beta + .0025;
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
+            end
+            while diff_AY > 0
+                beta = beta - .0025;
+                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
+            end
+        end
         while M_z < 0 
             delta = delta+ddelta;
             beta = deg2rad(0);
@@ -301,124 +374,53 @@ for turn = 1:1:length(radii)
             end
             while diff_AY > 0
                 beta = beta - .0025;
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            end
-        end
-        while M_z > 0 
-            delta = delta-ddelta;
-            beta = deg2rad(0);
-            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            while diff_AY < 0
-                beta = beta + .0025;
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            end
-            while diff_AY > 0
-                beta = beta - .0025;
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            end
-        end
-        % then re run all of THAT, slowly increasing your AY guess 
-        % until the front tire maxes out aka slip
-        % angle of 12
-
-        A_y = V^2/R;
-        r = A_y/V;
-        a_f = beta + a*r/V - delta;
-
-        while a_f > deg2rad(-12)
-            AYP = AYP+.005;
-            a = l*(1-WDF);
-            b = l*WDF;
-            R = radii(turn);
-            V = sqrt(R*32.2*AYP);
-            DF = Cl*V^2; 
-            dxf = DF*CoP/2/WRF; 
-            dxr = DF*(1-CoP)/2/WRR; 
-            IA_0f = IA_staticf - dxf*IA_gainf; 
-            IA_0r = IA_staticr - dxr*IA_gainr; 
-            wf = (WF+DF*CoP)/2;
-            wr = (WR+DF*(1-CoP))/2;
-            delta = l/R;
-            ddelta = delta*.005;
-            beta = deg2rad(0);
-            [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            while diff_AY < 0
-                beta = beta + .0025;
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-            end
-            while diff_AY > 0
-                beta = beta - .0025;
                 [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
-            end
-            %rad2deg([a_f a_r])
-            while M_z > 0 
-                delta = delta-ddelta;
-                beta = deg2rad(0);
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
-                end
-                while diff_AY > 0
-                    beta = beta - .0025;
-                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
-                end
-            end
-            while M_z < 0 
-                delta = delta+ddelta;
-                beta = deg2rad(0);
-                [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
-                while diff_AY < 0
-                    beta = beta + .0025;
-                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
-                end
-                while diff_AY > 0
-                    beta = beta - .0025;
-                    [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
-                    a_f = beta+a*r/V-delta; 
-                    if a_f < deg2rad(-12)
-                        diff_AY = -1;
-                    end
-                end
+                a_f = beta+a*r/V-delta; 
                 if a_f < deg2rad(-12)
-                    M_z = 1;
+                    diff_AY = -1;
                 end
+            end
+            if a_f < deg2rad(-12)
+                M_z = 1;
             end
         end
-        % once you've exceeded the capability of the fronts, take one small
-        % step back and that is your max lateral acceleration capacity
-        AYP = AYP-.005;
-        a = l*(1-WDF);
-        b = l*WDF;
-        R = radii(turn);
-        V = sqrt(R*32.2*AYP);
-        DF = Cl*V^2; 
-        dxf = DF*CoP/2/WRF; 
-        dxr = DF*(1-CoP)/2/WRR; 
-        IA_0f = IA_staticf - dxf*IA_gainf; 
-        IA_0r = IA_staticr - dxr*IA_gainr; 
-        wf = (WF+DF*CoP)/2;
-        wr = (WR+DF*(1-CoP))/2;
-        delta = l/R;
-        ddelta = delta*.01;
-        beta = deg2rad(0);
+    end
+    % once you've exceeded the capability of the fronts, take one small
+    % step back and that is your max lateral acceleration capacity
+    AYP = AYP-.005;
+    a = l*(1-WDF);
+    b = l*WDF;
+    R = radii(turn);
+    V = sqrt(R*32.2*AYP);
+    DF = Cl*V^2; 
+    dxf = DF*CoP/2/WRF; 
+    dxr = DF*(1-CoP)/2/WRR; 
+    IA_0f = IA_staticf - dxf*IA_gainf; 
+    IA_0r = IA_staticr - dxr*IA_gainr; 
+    wf = (WF+DF*CoP)/2;
+    wr = (WR+DF*(1-CoP))/2;
+    delta = l/R;
+    ddelta = delta*.01;
+    beta = deg2rad(0);
 
-        [AY, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta);
+    [AY, delta] = solveBalancedState(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip, ddelta);
 
-        steer = rad2deg(delta);
-        UG = rad2deg(delta-l/R)*32.2/AY;
-        Ugradient(turn) = UG;
-        %F_lat = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*cos(delta);
-        %F_drag = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*sin(delta);
-        steering(turn) = steer;
-        speed(turn) = V;
-        lateralg(turn) = AY/32.2;
-        %toc
+    steer = rad2deg(delta);
+    UG = rad2deg(delta-l/R)*32.2/AY;
+    Ugradient(turn) = UG;
+    %F_lat = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*cos(delta);
+    %F_drag = fnval([rad2deg(a_f);-wf;0],full_send_y)*.45*sin(delta);
+    steering(turn) = steer;
+    speed(turn) = V;
+    lateralg(turn) = AY/32.2;
+    %toc
 end
 % Lateral Acceleration
 
 % Braking Performance
 velocity = 15:5:130;
+A_X = zeros(1, length(velocity)); 
+
 disp('     Braking Envelope')
 % the braking sim works exactly the same as acceleration, except now all 4
 % tires are contributing to the total braking capacity
@@ -444,8 +446,8 @@ for  i = 1:1:length(velocity)
         fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
         fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
     end
-    fxf(find(abs(fxf) > 1000)) = [];
-    fxr(find(abs(fxr) > 1000)) = [];
+    fxf(abs(fxf) > 1000) = [];
+    fxr(abs(fxr) > 1000) = [];
     FXF = min(fxf);
     FXR = min(fxr);
     FX = abs(2*FXF+2*FXR);
@@ -468,8 +470,8 @@ for  i = 1:1:length(velocity)
             fxf(k) = fnval([sl(k);-wf;rad2deg(-IA_f)],full_send_x)*sf_x;
             fxr(k) = fnval([sl(k);-wr;rad2deg(-IA_r)],full_send_x)*sf_x;
         end
-        fxf(find(abs(fxf) > 1000)) = [];
-        fxr(find(abs(fxr) > 1000)) = [];
+        fxf(abs(fxf) > 1000) = [];
+        fxr(abs(fxr) > 1000) = [];
         FXF = min(fxf);
         FXR = min(fxr);
         FX = abs(2*FXF+2*FXR);
@@ -565,6 +567,10 @@ xx = xx.endurance_racing_line;
 % x(end+1) = x(2);
 %% Section 10: Generate Final Endurance Trajectory
 x = xx;
+
+num_points = length(x);
+path_points = zeros(num_points, 2); 
+
 % Plot finished line
 x(end+1) = x(1);
 x(end+1) = x(2);
@@ -625,6 +631,7 @@ function [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, tw
     diff_AY = A_y-AY;
 
 end
+
 
 % It is highly recommended to create another helper function for the
 % force/moment balancing loops to further simplify the main script.
