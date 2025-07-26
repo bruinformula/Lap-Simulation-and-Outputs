@@ -1,7 +1,7 @@
 %% Section 1: Getting Longitudinal and Lateral Accelerations around Track
-endurance_coords = "Endurance_Coordinates_1.xlsx";
+ax_coords = "Autocross_Coordinates_1.xlsx";
 addpath('Lap-Simulation');
-[A_long_g, A_lat_g, distance] = Lap_Sim(endurance_coords);
+[A_long_g, A_lat_g, distance] = Lap_Sim(ax_coords);
 
 
 %% Section 2: Plot Longitudinal & Lateral Accelerations

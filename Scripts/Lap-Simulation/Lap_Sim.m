@@ -1,4 +1,4 @@
-function [acceleration, lateral_accel, distance] = Lap_Sim(lap_coords)
+function [acceleration_ax, lateral_accel_ax, distance_ax] = Lap_Sim(lap_coords)
 
 % Jonathan Vogel
 % Clemson Formula SAE
@@ -20,8 +20,7 @@ addpath("Data Files")
 % them global so that all the other functions can access them
 global r_max accel grip deccel lateral cornering gear shift_points...
     top_speed r_min path_boundaries tire_radius shift_time...
-    powertrainpackage
-
+    powertrainpackage track_width path_boundaries_ax
 
 
 
@@ -31,7 +30,7 @@ global r_max accel grip deccel lateral cornering gear shift_points...
 % touch any of this, unless you want to change the tire being evaluated.
 % The only things you might want to change are the scaling factors at the
 % bottom of the section
-disp('2019 Michigan Endurance Points Analysis')
+disp('2019 Michigan AutoCross Points Analysis')
 disp('Loading Tire Model')
 
 % First we load in the lateral tire force model, which is a Pacejka model
@@ -92,9 +91,10 @@ LLTD = 51; % Front lateral load transfer distribution (%)
 W = 660; % vehicle + driver weight (lbs)
 WDF = 44.754; % front weight distribution (%)
 cg = 10.5/12; % center of gravity height (ft)
-l = 61/12; % wheelbase (ft)
-twf = 46/12; % front track width (ft)
-twr = 44/12; % rear track width (ft)
+l = 60.25/12; % wheelbase (ft)
+twf = 45/12; % front track width (ft)
+twr = 45/12; % rear track width (ft)
+
 % some intermediary calcs you don't have to touch
 LLTD = LLTD/100;
 WDF = WDF/100;
@@ -103,7 +103,7 @@ WF = W*WDF; % front weight
 WR = W*(1-WDF); % rear weight
 %a = l*(1-WDF); % front axle to cg
 %b = l*WDF; % rear axle to cg
-%tw = twf;
+tw = twf;
 
 
 
@@ -131,6 +131,7 @@ casterf = 4; % front caster angle (deg)
 KPIf = 7.18; % front kingpin inclination angle (deg)
 %casterr = 4;
 KPIr = 8.49;
+
 % intermediary calcs, plz ignore
 IA_staticf = deg2rad(IA_staticf); % front static camber angle (deg)
 IA_staticr = deg2rad(IA_staticr); % rear static camber angle (deg)
@@ -174,7 +175,7 @@ deltar = 0;
 
 % NOTE: I'm tampering here
 % velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
-velocity = 15:5:130; % range of velocities at which sim will evaluate (ft/s)
+velocity = 15:5:90; % range of velocities at which sim will evaluate (ft/s)
 % radii = [15:10:155]; % range of turn radii at which sim will evaluate (ft)
 radii = 15:10:155;
 % radii = 15:10:155; % range of turn radii at which sim will evaluate (ft)
@@ -252,10 +253,12 @@ for turn = 1:1:length(radii)
     % AY match up
     while diff_AY < 0
         beta = beta + .0025;
+        %disp('Stuck in beta loop 1...');
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
     end
     while diff_AY > 0
         beta = beta - .0025;
+        %disp('Stuck in beta loop 2...');
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
     end
     % at that point, check the yaw moment. Re-run the above loop^ but
@@ -264,19 +267,23 @@ for turn = 1:1:length(radii)
     while M_z < 0 
         delta = delta+ddelta;
         beta = deg2rad(0);
+        %disp(['Stuck in M_z loop 1. M_z = ', num2str(M_z)]);
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
         while diff_AY < 0
             beta = beta + .0025;
+            %disp(['Stuck in Test 1']);
             [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip); 
         end
         while diff_AY > 0
             beta = beta - .0025;
+            %disp(['Stuck in Test 2']);
             [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
         end
     end
     while M_z > 0 
         delta = delta-ddelta;
         beta = deg2rad(0);
+        %disp(['Stuck in M_z loop 2. M_z = ', num2str(M_z)]);
         [~, M_z, ~, ~, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip);
         while diff_AY < 0
             beta = beta + .0025;
@@ -296,7 +303,7 @@ for turn = 1:1:length(radii)
     a_f = beta + a*r/V - delta;
 
     while a_f > deg2rad(-12)
-        AYP = AYP+.005;
+        AYP = AYP+.1;
         a = l*(1-WDF);
         b = l*WDF;
         R = radii(turn);
@@ -357,7 +364,7 @@ for turn = 1:1:length(radii)
     end
     % once you've exceeded the capability of the fronts, take one small
     % step back and that is your max lateral acceleration capacity
-    AYP = AYP-.005;
+    AYP = AYP-.1;
     a = l*(1-WDF);
     b = l*WDF;
     R = radii(turn);
@@ -389,7 +396,7 @@ end
 
 
 % Braking Performance
-velocity = 15:5:130;
+velocity = 15:5:90;
 
 disp('     Braking Envelope')
 A_X = zeros(1, length(velocity));
@@ -422,142 +429,115 @@ cornering = csaps(radii,velocity_y);
 
 
 
-%% Section 7: Load Endurance Track Coordinates
-disp('Loading Endurance Track Coordinates')
-[data, ~] = xlsread(lap_coords,'Scaled');
 
-% the coordinates are now contained within 'data'. This is a 5 column
-% matrix that contains a set of defined 'gates' that the car must mavigate
-% through
-% Column 1: Gate #
-% Column 2: Outside boundary, x coordinate
-% Column 3: Outside boundary, y coordinate
-% Column 4: Inside boundary, x coordinate
-% Column 5: Inside boundary, y coordinate
-
-% sort the data into "inside" and "outside" cones
+%% Section 12: Load Autocross Track Coordinates
+disp('Loading Autocross Track Coordinates')
+[data text] = xlsread('Autocross_Coordinates_2.xlsx','Scaled');
 outside = data(:,2:3);
 inside = data(:,4:5);
-% t = [1:length(outside)];
-% define the minimum turn radius of the car
+t = [1:length(outside)];
 r_min = 4.5*3.28;
-tw = 46/12;
 r_min = r_min-tw/2;
-%pp_out = spline(t,outside');
-%pp_in = spline(t,inside');
+pp_out = spline(t,outside');
+pp_in = spline(t,inside');
 
+%plot(outside(:,1),outside(:,2),'ok')
+%hold on
+%plot(inside(:,1),inside(:,2),'ok')
+clear path_boundaries
 for i = 1:1:length(outside)
-    % isolate individual gates
     gate_in = inside(i,:);
     gate_out = outside(i,:);
-    % create the line that connects the two cones together
+    %plot([gate_in(1) gate_out(1)],[gate_in(2) gate_out(2)],'-k')
     x1 = gate_in(1);
     x2 = gate_out(1);
     y1 = gate_in(2);
     y2 = gate_out(2);
-    % polynomial expression for the line:
     coeff = polyfit([x1, x2], [y1, y2], 1);
-    % adjust the width of the gate for the width of the car:
     gate_width = sqrt((x2-x1)^2+(y2-y1)^2);
-    % path_width = gate_width-tw;
+    path_width = gate_width-tw;
     x_fs = tw/(2*gate_width);
-    % update the gate boundaries based on said new width
     x_bound = [min(x1,x2)+x_fs*abs(x2-x1),max(x1,x2)-x_fs*abs(x2-x1)];
-    path_boundaries(i,:) = [coeff x_bound];
+    path_boundaries_ax(i,:) = [coeff x_bound];
+    %text(round(x1),round(y1),num2str(i))
 end
 
 
+%save('path_boundaries.mat','path_boundaries');
+%% Section 13: Load Autocross Racing Line
+disp('Loading Autocross Racing Line')
+xx = load('autocross_racing_line.mat');
+xx = xx.autocross_racing_line;
+%% Section 14: Optimize Autocross Racing Line
+% Same applies here, optimizing the line is optional but if you want,
+% simply un-comment the lines of code below:
 
 
-
-%% Seciton 8: Load Endurance Racing Line
-disp('Loading Endurance Racing Line')
-xx = load('endurance_racing_line.mat');
-xx = xx.endurance_racing_line;
-
-
-
-
-
-%% Section 9: Optimize Endurance Racing Line
-% The pre-loaded racing line should work for most applications; however,
-% if you have the need to re-evaluate or generate a new optimized racing
-% line, simply un-comment the code below:
-
-% 
-% disp('Optimizing Endurance Racing Line')
+% disp('Optimizing Racing Line')
 % A = eye(length(xx));
 % b = ones(length(xx),1);
 % lb = zeros(1,length(xx));
 % ub = ones(1,length(xx));
 % options = optimoptions('fmincon',...
-%      'Algorithm','sqp','Display','iter','ConstraintTolerance',1e-12);
-%  options = optimoptions(options,'MaxIter', 10000, 'MaxFunEvals', 1000000,'ConstraintTolerance',1e-12,'DiffMaxChange',.1);
+%     'Algorithm','sqp','Display','iter','ConstraintTolerance',1e-12);
+% options = optimoptions(options,'MaxIter', 10000, 'MaxFunEvals', 1000000,'ConstraintTolerance',1e-12,'DiffMaxChange',.1);
 % 
-%  x = fmincon(@lap_time,xx,[],[],[],[],lb,ub,@track_curvature,options);
-%  xx = x;
-%  x(end+1) = x(1);
-% x(end+1) = x(2);
+% x = fmincon(@lap_time_sprint,xx,[],[],[],[],lb,ub,@track_curvature_sprint,options);
+% xx_auto = x;
+% % x(end+1) = x(1);
+% % x(end+1) = x(2);
+%% Section 15: Generate Final Autocross Trajectory
+xx_auto = xx;
+x = xx_auto;
+%Plot finished line
 
-
-
-
-
-%% Section 10: Generate Final Endurance Trajectory
-x = xx;
-
-num_points = length(x);
-path_points = zeros(num_points, 2); 
-
-% Plot finished line
-x(end+1) = x(1);
-x(end+1) = x(2);
 for i = 1:1:length(x)
-    % for each gate, find the position defined between the cones
-    coeff = path_boundaries(i,1:2);
-    x2 = max(path_boundaries(i,3:4));
-    x1 = min(path_boundaries(i,3:4));
+    coeff = path_boundaries_ax(i,1:2);
+    x2 = max(path_boundaries_ax(i,3:4));
+    x1 = min(path_boundaries_ax(i,3:4));
     position = x(i);
-    % place the car within via linear interpolation
     x3 = x1+position*(x2-x1);
     y3 = polyval(coeff,x3);
     %plot(x3,y3,'og')
-    % the actual car's trajectory defined in x-y coordinates:
-    path_points(i,:) = [x3 y3];
+    path_points_ax(i,:) = [x3 y3];
 end
-
-%x = linspace(1,t(end-1),1000);
-%ppv = pchip(t,path_points');
-%vehicle_path = ppval(ppv,x);
-%vehicle_path_EN = vehicle_path;
-% Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
-
+x = linspace(1,t(end),1000);
+ppv = pchip(t,path_points_ax');
+vehicle_path = ppval(ppv,x);
+vehicle_path_AX = vehicle_path;
+Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 
 
 
 
-%% Section 11: Simulate Endurance Lap
+
+%% Section 16: Simulate Autocross Lap
 disp('Plotting Vehicle Trajectory')
-[acceleration, lateral_accel, distance] = lap_information(xx);
+[laptime_ax time_elapsed_ax velocity_ax, acceleration_ax lateral_accel_ax gear_counter_ax path_length_ax weights_ax distance_ax] = lap_information_sprint(xx_auto);
+
+
+
+
 
 end
+%% Section 17: Helper Functions
 
 function [AY, M_z, F_y, F_x, diff_AY] = calculateVehicleDynamics(V, R, W, cg, twf, twr, LLTD, rg_f, rg_r, wf, wr, IA_gainf, IA_0f, KPIf, casterf, delta, IA_gainr, IA_0r, KPIr, deltar, beta, a, b, Cd, T_lock, A, sf_y, grip)
 
     A_y = V^2/R;
-    WT = A_y*cg*W/mean([twf twr])/32.2/12;
-    WTF = WT*LLTD;
-    WTR = WT*(1-LLTD);
-    phif = A_y*rg_f*pi/180/32.2;
-    phir = A_y*rg_r*pi/180/32.2;
+    total_lateral_load_transfer = A_y*cg*W/mean([twf twr])/32.2/12;
+    WTF = total_lateral_load_transfer*LLTD;
+    lateral_load_transfer_r = total_lateral_load_transfer*(1-LLTD);
+    roll_angle_f = A_y*rg_f*pi/180/32.2;
+    roll_angle_r = A_y*rg_r*pi/180/32.2;
     wfin = wf-WTF;
     wfout = wf+WTF;
-    wrin = wr-WTR;
-    wrout = wr+WTR;
-    IA_f_in = -twf*sin(phif)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +phif;
-    IA_f_out = -twf*sin(phif)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + phif;
-    IA_r_in = -twr*sin(phir)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +phir;
-    IA_r_out = -twr*sin(phir)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + phir;
+    wrin = wr-lateral_load_transfer_r;
+    wrout = wr+lateral_load_transfer_r;
+    IA_f_in = -twf*sin(roll_angle_f)*12/2*IA_gainf - IA_0f - KPIf*(1-cos(delta)) - casterf*sin(delta) +roll_angle_f;
+    IA_f_out = -twf*sin(roll_angle_f)*12/2*IA_gainf + IA_0f + KPIf*(1-cos(delta)) - casterf*sin(delta) + roll_angle_f;
+    IA_r_in = -twr*sin(roll_angle_r)*12/2*IA_gainr - IA_0r - KPIr*(1-cos(deltar)) - casterf*sin(deltar) +roll_angle_r;
+    IA_r_out = -twr*sin(roll_angle_r)*12/2*IA_gainr + IA_0r + KPIr*(1-cos(deltar)) - casterf*sin(deltar) + roll_angle_r;
     r = A_y/V;
     a_f = beta+a*r/V-delta;
     a_r = beta-b*r/V;
