@@ -1,4 +1,4 @@
-function [acceleration_ax, lateral_accel_ax, distance_ax] = Lap_Sim(lap_coords)
+function laptime_ax = Lap_Sim(lap_coords,rolldegree,riderate1,riderate2)
 
 % Jonathan Vogel
 % Clemson Formula SAE
@@ -35,7 +35,7 @@ disp('Loading Tire Model')
 
 % First we load in the lateral tire force model, which is a Pacejka model
 % created by derek:
-
+addpath('C:\Users\ethan\Box\BFR\MK10\Mk. 10 Vehicle Dynamics\New Member Projects\Custom Track Importation\Lap Sim');
 load("A1654run21_MF52_Fy_GV12.mat")
 % then load in coefficients for Magic Formula 5.2 Tire Model:
 load("A1654run21_MF52_Fy_12.mat")
@@ -116,11 +116,11 @@ disp('Loading Suspension Kinematics')
 % can essentially leave this portion out of the analysis. Useful if you are
 % only trying to explore some higher level relationships
 % Pitch and roll gradients define how much the car's gonna move around
-rg_f = 1.4; % front roll gradient (deg/g)
-rg_r = 1.4; % rear roll gradient (deg/g)
+rg_f = rolldegree; % front roll gradient (deg/g)
+rg_r = rolldegree; % rear roll gradient (deg/g)
 pg = 0; % pitch gradient (deg/g)
-WRF = 113.1228; % front and rear ride rates (lbs/in)
-WRR = 101.9789;
+WRF = riderate1; % front and rear ride rates (lbs/in)
+WRR = riderate2;
 % then you can select your camber alignment
 IA_staticf = 0; % front static camber angle (deg)
 IA_staticr = 0; % rear static camber angle (deg)
@@ -396,6 +396,7 @@ end
 
 
 % Braking Performance
+%
 velocity = 15:5:90;
 
 disp('     Braking Envelope')
@@ -513,7 +514,7 @@ Length = arclength(vehicle_path(1,:),vehicle_path(2,:));
 
 %% Section 16: Simulate Autocross Lap
 disp('Plotting Vehicle Trajectory')
-[laptime_ax time_elapsed_ax velocity_ax, acceleration_ax lateral_accel_ax gear_counter_ax path_length_ax weights_ax distance_ax] = lap_information_sprint(xx_auto);
+[laptime_ax ] = lap_information_sprint(xx_auto);
 
 
 
